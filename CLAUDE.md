@@ -70,8 +70,9 @@ brief: follow it top to bottom.
 2. `node --test test/*.test.mjs` green, with tests for what you changed.
 3. `node tools/check-public.mjs origin/main` must pass: it fails if the diff contains his note
    text, the token or the API URL. Fixtures are always synthetic.
-4. Bump `VERSION` in `src/app.js`, add a line to `CHANGELOG.md`, fast-forward `main`, and
-   `git push origin main` (never force-push).
+4. Bump `VERSION` in `src/app.js`, add a line to `CHANGELOG.md`, `git fetch` and rebase your
+   branch on `origin/main` (someone else may have pushed), re-run the tests, fast-forward `main`,
+   and `git push origin main` (never force-push).
 5. Confirm the deploy: `gh api repos/Metry630/bjj-notes/pages/builds/latest` shows `built` for your
    commit, and `curl -s https://metry630.github.io/bjj-notes/src/app.js | grep VERSION` shows the
    new version. If the live app is broken, `git revert` and push at once.

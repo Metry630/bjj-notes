@@ -423,10 +423,29 @@ function show(view) {
   fill(main);
   if (!store.get('config', null)) {
     nav.hidden = true;
+    // Pasting matters on iPhone: a home-screen app doesn't share storage with Safari.
+    const input = h('input', { type: 'url', placeholder: 'https://metry630.github.io/bjj-notes/#api=…', autocomplete: 'off' });
+    const msg = h('p', { class: 'msg', role: 'status' });
     main.append(
       h('h1', null, 'BJJ notes'),
       h('p', null, 'This phone is not linked to your sheet yet.'),
-      h('p', null, 'On this phone, open your sheet "BJJ Lesson Tracker", go to the App · Setup tab and tap the phone link in B4.')
+      h('p', null, 'In your sheet "BJJ Lesson Tracker", open the App · Setup tab, copy the phone link in B4 and paste it here.'),
+      h(
+        'form',
+        {
+          onsubmit: (ev) => {
+            ev.preventDefault();
+            const v = input.value.trim();
+            const cfg = v.includes('#') ? parseLink(v.slice(v.indexOf('#'))) : null;
+            if (!cfg) return void (msg.textContent = 'That is not the phone link from B4. Copy the whole link and try again.');
+            store.set('config', cfg);
+            location.reload();
+          },
+        },
+        input,
+        h('button', { class: 'primary', type: 'submit' }, 'Link this phone'),
+        msg
+      )
     );
     return;
   }
