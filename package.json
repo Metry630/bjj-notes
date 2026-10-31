@@ -1,0 +1,12 @@
+{
+  "name": "bjj-notes",
+  "private": true,
+  "type": "module",
+  "description": "Dictate BJJ notes on the phone, keep them in a Google Sheet, search and ask them later.",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

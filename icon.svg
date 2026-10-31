@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
+  <rect width="180" height="180" rx="36" fill="#14161a"/>
+  <rect x="0" y="78" width="180" height="26" fill="#1f4fd1"/>
+  <rect x="122" y="78" width="30" height="26" fill="#0b0c0e"/>
+  <rect x="128" y="78" width="5" height="26" fill="#ffffff"/>
+  <rect x="140" y="78" width="5" height="26" fill="#ffffff"/>
+  <text x="90" y="62" text-anchor="middle" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="40" font-weight="800" fill="#ffffff">BJJ</text>
+  <text x="90" y="145" text-anchor="middle" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="26" font-weight="600" fill="#9aa0aa">notes</text>
+</svg>
