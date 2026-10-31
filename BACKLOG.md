@@ -5,7 +5,7 @@ Items marked (proposal) need a yes from him in `App · Feedback` before they're 
 
 ## Up next
 
-- [ ] **Offline-safe saving.** A service worker caches the app shell so it opens with no signal.
+- [x] **Offline-safe saving.** (v0.2.0) A service worker caches the app shell so it opens with no signal.
       A note saved offline goes into a local queue (keep the client id, so retries never
       duplicate) and is sent when the phone is back online; the Log screen shows "queued" items.
 - [ ] **Topic index, part 1.** Create `App · Topics` (`id`, `topic`, `aliases`, `summary`,

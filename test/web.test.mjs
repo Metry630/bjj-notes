@@ -106,3 +106,27 @@ test('check-public flags note text and secrets in added lines only', () => {
   assert.equal(addedLines(diff).length, 3);
   assert.equal(shingles('too short').size, 0);
 });
+
+import { enqueue, flush } from '../src/queue.js';
+
+test('queue keeps one entry per note id and sends oldest first', async () => {
+  const a = { tab: 'T', rows: [{ id: 'a' }] };
+  const b = { tab: 'T', rows: [{ id: 'b' }] };
+  let q = enqueue(enqueue(enqueue([], a), b), { tab: 'T', rows: [{ id: 'a', text: 'x' }] });
+  assert.deepEqual(q.map((e) => e.rows[0].id), ['b', 'a']);
+  const sent = [];
+  const res = await flush(q, async (e) => void sent.push(e.rows[0].id));
+  assert.deepEqual(sent, ['b', 'a']);
+  assert.deepEqual(res, { left: [], sent: 2, error: null });
+});
+
+test('queue stops at the first failure and keeps the rest', async () => {
+  const q = ['a', 'b', 'c'].map((id) => ({ tab: 'T', rows: [{ id }] }));
+  let n = 0;
+  const res = await flush(q, async () => {
+    if (++n === 2) throw new Error('offline');
+  });
+  assert.equal(res.sent, 1);
+  assert.deepEqual(res.left.map((e) => e.rows[0].id), ['b', 'c']);
+  assert.equal(res.error.message, 'offline');
+});

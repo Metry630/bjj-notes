@@ -1,9 +1,10 @@
 import { store } from './store.js';
 import { makeApi, parseLink } from './api.js';
 import { search, toCells, highlightTerms, norm } from './search.js';
+import { enqueue, flush } from './queue.js';
 import { todayISO, isoToSheetDate, nextRunLabel, hoursSince, shortTime } from './dates.js';
 
-export const VERSION = '0.1.0';
+export const VERSION = '0.2.0';
 
 const TABS = {
   inbox: 'App · Inbox',
@@ -35,6 +36,7 @@ const state = {
   feedback: store.get('feedback', []),
   log: store.get('log', []),
   topics: store.get('topics', []),
+  queue: store.get('queue', []),
   settings: store.get('settings', { routine_mode: 'normal' }),
   syncedAt: store.get('syncedAt', ''),
   status: '',
@@ -113,16 +115,28 @@ views.log = (root) => {
         save.disabled = true;
         msg.textContent = 'Saving…';
         try {
-          await api.call('add', {
+          const entry = {
             tab: TABS.inbox,
             rows: [{ id: d.id, session_date: d.date, location: d.location, hours: d.hours, text: d.text }],
-          });
+          };
+          let queued = false;
+          try {
+            await api.call('add', { tab: entry.tab, rows: entry.rows });
+          } catch (e) {
+            if (e.message !== 'offline') throw e;
+            state.queue = enqueue(state.queue, entry);
+            store.set('queue', state.queue);
+            queued = true;
+          }
           store.set('last', { location: d.location, hours: d.hours });
           draft.id = uid();
           text.value = '';
           keep();
-          msg.textContent = `Saved. Claude files it into your sheet at ${runAt()}. More to add? Just save again.`;
-          refresh();
+          msg.textContent = queued
+            ? 'No connection. Your note is queued on this phone and goes out when you are back online.'
+            : `Saved. Claude files it into your sheet at ${runAt()}. More to add? Just save again.`;
+          if (queued) update();
+          else refresh();
         } catch (e) {
           msg.textContent = `${errorText(e)} Your note is still here, tap Save again.`;
         } finally {
@@ -138,9 +152,20 @@ views.log = (root) => {
   );
   root.append(h('h1', null, 'Log a session'), form, list);
 
-  return () => {
+  const update = () => {
     const items = newest(state.inbox, 'created_at').filter((r) => r.status !== 'cancelled').slice(0, 8);
-    fill(list, items.length ? h('h2', null, 'Recently saved') : '',
+    const queued = state.queue.map((q) => q.rows[0]);
+    fill(list, queued.length ? h('h2', null, 'Queued on this phone') : '',
+      queued.map((r) =>
+        h(
+          'div',
+          { class: 'card' },
+          h('div', { class: 'meta' }, `${isoToSheetDate(r.session_date) || r.session_date} · ${r.location || 'no gym'} · ${r.hours || '?'} h`),
+          h('p', { class: 'clip' }, r.text),
+          h('div', { class: 'meta' }, 'Queued. Sends when you are back online.')
+        )
+      ),
+      items.length ? h('h2', null, 'Recently saved') : '',
       items.map((r) =>
         h(
           'div',
@@ -160,6 +185,7 @@ views.log = (root) => {
       )
     );
   };
+  return update;
 };
 
 views.search = (root) => {
@@ -486,6 +512,12 @@ async function refresh() {
   syncing = true;
   setStatus('Syncing…');
   try {
+    if (state.queue.length) {
+      const res = await flush(state.queue, (q) => api.call('add', { tab: q.tab, rows: q.rows }));
+      state.queue = res.left;
+      store.set('queue', state.queue);
+      if (res.error && res.error.message !== 'offline') setStatus(errorText(res.error));
+    }
     const keys = ['notes', 'inbox', 'questions', 'feedback', 'log', 'topics', 'settings'];
     const results = await api.batch([
       { action: 'notes' },
@@ -514,6 +546,9 @@ async function refresh() {
     drawNav();
   }
 }
+
+window.addEventListener('online', () => refresh());
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && hoursSince(state.syncedAt) > 0.03) refresh();
