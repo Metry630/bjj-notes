@@ -8,7 +8,7 @@ Items marked (proposal) need a yes from him in `App · Feedback` before they're 
 - [x] **Offline-safe saving.** (v0.2.0) A service worker caches the app shell so it opens with no signal.
       A note saved offline goes into a local queue (keep the client id, so retries never
       duplicate) and is sent when the phone is back online; the Log screen shows "queued" items.
-- [ ] **Topic index, part 1.** Create `App · Topics` (`id`, `topic`, `aliases`, `summary`,
+- [x] **Topic index, part 1.** (v0.2.1) Create `App · Topics` (`id`, `topic`, `aliases`, `summary`,
       `sources`, `updated_at`). Tag every Sheet1 tip with one or more topics (positions, techniques,
       principles) and write a short summary per topic of what his notes say, in his language, with
       session dates. Start with the 15 topics with the most tips. Search already shows matching
