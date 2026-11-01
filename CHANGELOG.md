@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 (2026-11-01)
+
+- Topic index, part 2a: 6 more topics with summaries (21 in total), shown first in Search.
+
 ## 0.2.1 (2026-11-01)
 
 - Topic index, part 1: 15 topics with summaries now live in the sheet, and Search shows the matching summary first.

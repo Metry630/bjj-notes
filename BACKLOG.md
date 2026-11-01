@@ -13,16 +13,18 @@ Items marked (proposal) need a yes from him in `App · Feedback` before they're 
       principles) and write a short summary per topic of what his notes say, in his language, with
       session dates. Start with the 15 topics with the most tips. Search already shows matching
       topic summaries first.
-- [ ] **Topic index, part 2.** Cover the remaining topics. From then on, each run refreshes only
+- [x] **Topic index, part 2a.** (v0.2.2) Six more topics (21 in total).
+- [ ] **Topic index, part 2b.** Cover the remaining topics. From then on, each run refreshes only
       the topics that newly filed notes touch.
 - [ ] **Topic browser.** A Topics list in the app (most tips first); tapping one shows the summary
-      and the matching tips with dates.
+      and the matching tips with dates. Add a topic filter on the notes list.
 - [ ] **Search synonyms from his notes.** Grow `ALIASES` in `src/search.js` from the spellings he
       actually uses (e.g. halfguard / half guard, sidecontrol, backtake), with tests.
 - [ ] **Pull to refresh and a sync indicator** on every screen.
 
 ## Later
 
+- [ ] (proposal) Better voice dictation than the built-in phone keyboard (for example a speech-to-text service with a BJJ vocabulary). Adds a service and changes capture, so it needs a yes.
 - [ ] (proposal) "Before class" screen: his last 3 sessions plus one older topic to review.
 - [ ] (proposal) Monthly hours and sessions on Home.
 

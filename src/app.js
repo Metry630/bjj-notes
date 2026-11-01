@@ -4,7 +4,7 @@ import { search, toCells, highlightTerms, norm } from './search.js';
 import { enqueue, flush } from './queue.js';
 import { todayISO, isoToSheetDate, nextRunLabel, hoursSince, shortTime } from './dates.js';
 
-export const VERSION = '0.2.1';
+export const VERSION = '0.2.2';
 
 const TABS = {
   inbox: 'App · Inbox',
