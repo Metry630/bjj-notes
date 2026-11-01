@@ -14,7 +14,8 @@ Items marked (proposal) need a yes from him in `App · Feedback` before they're 
       session dates. Start with the 15 topics with the most tips. Search already shows matching
       topic summaries first.
 - [x] **Topic index, part 2a.** (v0.2.2) Six more topics (21 in total).
-- [ ] **Topic index, part 2b.** Cover the remaining topics. From then on, each run refreshes only
+- [x] **Topic index, part 2b.** (v0.2.3) Five more topics (26 in total).
+- [ ] **Topic index, part 2c.** Cover the remaining topics. From then on, each run refreshes only
       the topics that newly filed notes touch.
 - [ ] **Topic browser.** A Topics list in the app (most tips first); tapping one shows the summary
       and the matching tips with dates. Add a topic filter on the notes list.
@@ -22,9 +23,12 @@ Items marked (proposal) need a yes from him in `App · Feedback` before they're 
       actually uses (e.g. halfguard / half guard, sidecontrol, backtake), with tests.
 - [ ] **Pull to refresh and a sync indicator** on every screen.
 
+- [ ] **Rate and compare dictation.** A button to rate each note's dictation and compare the phone keyboard against a second option. Needs the second option first (see proposal below).
+- [ ] **Run now button.** A button that starts the routine immediately. Needs a trigger credential from him first (proposal).
+
 ## Later
 
-- [ ] (proposal) Better voice dictation than the built-in phone keyboard (for example a speech-to-text service with a BJJ vocabulary). Adds a service and changes capture, so it needs a yes.
+- [ ] (proposal, owner said yes if free per use and self-running; needs his pick of service) Better voice dictation than the built-in phone keyboard (for example a speech-to-text service with a BJJ vocabulary). Adds a service and changes capture, so it needs a yes.
 - [ ] (proposal) "Before class" screen: his last 3 sessions plus one older topic to review.
 - [ ] (proposal) Monthly hours and sessions on Home.
 

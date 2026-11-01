@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3 (2026-11-02)
+
+- Topic index, part 2b: 5 more topics (26 in total).
+
 ## 0.2.2 (2026-11-01)
 
 - Topic index, part 2a: 6 more topics with summaries (21 in total), shown first in Search.
