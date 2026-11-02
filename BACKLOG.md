@@ -5,6 +5,11 @@ His requests (from `App · Feedback`) always go above your own items.
 
 ## Up next
 
+- [ ] **Analysis page** (he asked, 2 Nov). New screen: hours per gym, most common keywords per gym,
+      fun facts (longest streak, busiest month, most drilled topic, etc.). Reading chosen: every
+      session since 1 October of the latest year counts as the gym he named for that period, as a
+      display rule in the app only (Sheet1 rows are never edited). Ship as part 1 (hours and
+      keywords per gym), then fun facts as part 2.
 - [ ] **Clean up test items** (he asked, 2 Nov). Wait until the TEST recording (inbox id starting
       `4c23bbcf`) has been transcribed and its preview has been visible since at least the
       previous run. Then set `hidden: "yes"` on: every `App · Inbox` row with status `test`, the
