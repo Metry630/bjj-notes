@@ -104,6 +104,12 @@ for something you could decide, and never answer a request with a question.
    5 minutes, until it shows the new version. If the live app is broken, `git revert` and push at
    once.
 
+## Removing things from the app
+
+Sheet rows are never deleted (the API can't). To remove an item from the app at his request, set
+`hidden: "yes"` on its row with `update`; the app drops hidden rows from every list. Use this for
+App tabs only. Sheet1 is his notes: if a note there is wrong, say so in the log instead.
+
 ## Hard rules
 
 - This repo is public. No note text, questions, answers, names, URLs or tokens in code, tests,

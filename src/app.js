@@ -5,7 +5,7 @@ import { enqueue, flush } from './queue.js';
 import { startRecording, blobToBase64, audioBatches } from './recorder.js';
 import { todayISO, isoToSheetDate, nextRunLabel, hoursSince, shortTime } from './dates.js';
 
-export const VERSION = '0.3.0';
+export const VERSION = '0.3.1';
 
 const TABS = {
   inbox: 'App · Inbox',
@@ -706,7 +706,11 @@ async function refresh() {
     results.forEach((r, i) => {
       if (!r.ok) return;
       const key = keys[i];
-      const value = key === 'notes' ? { total_hours: r.total_hours, rows: r.rows } : key === 'settings' ? { routine_mode: r.routine_mode } : r.rows;
+      // Rows marked hidden (cleaned up at his request) never show in the app; they stay in the sheet.
+      const value =
+        key === 'notes' ? { total_hours: r.total_hours, rows: r.rows }
+        : key === 'settings' ? { routine_mode: r.routine_mode }
+        : r.rows.filter((row) => !row.hidden);
       state[key] = value;
       store.set(key, value);
     });

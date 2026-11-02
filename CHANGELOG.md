@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1 (2026-11-02)
+
+- Rows marked hidden (cleanup at his request) no longer show anywhere in the app.
+
 ## 0.3.0 (2026-11-02)
 
 - Record button on Log: voice notes upload in slices and are transcribed with Whisper in the next run (free per use).

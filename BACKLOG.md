@@ -5,6 +5,13 @@ His requests (from `App · Feedback`) always go above your own items.
 
 ## Up next
 
+- [ ] **Clean up test items** (he asked, 2 Nov). Wait until the TEST recording (inbox id starting
+      `4c23bbcf`) has been transcribed and its preview has been visible since at least the
+      previous run. Then set `hidden: "yes"` on: every `App · Inbox` row with status `test`, the
+      `App · Log` rows `run-20261031T1346` and every row with mode `manual` started on 2026-11-02,
+      and make sure that recording's audio slices are cleared (`audio-done`). Check Sheet1 for
+      rows that aren't real sessions (none known as of 2 Nov) and report, don't touch. Reply in
+      the log when done.
 - [ ] **Topic browser** (he asked, 1 Nov). A Topics list in the app, most tips first; tapping one
       shows the summary and the matching tips with dates. Add a topic filter on Search.
 - [ ] **Topic index, part 2d.** Cover the remaining topics. From then on, each run refreshes only
