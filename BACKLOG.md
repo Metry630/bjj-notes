@@ -1,39 +1,29 @@
 # Backlog
 
 Top unchecked item first. One per run. Split anything that won't fit in a run.
-Items marked (proposal) need a yes from him in `App · Feedback` before they're built.
+His requests (from `App · Feedback`) always go above your own items.
 
 ## Up next
 
-- [x] **Offline-safe saving.** (v0.2.0) A service worker caches the app shell so it opens with no signal.
-      A note saved offline goes into a local queue (keep the client id, so retries never
-      duplicate) and is sent when the phone is back online; the Log screen shows "queued" items.
-- [x] **Topic index, part 1.** (v0.2.1) Create `App · Topics` (`id`, `topic`, `aliases`, `summary`,
-      `sources`, `updated_at`). Tag every Sheet1 tip with one or more topics (positions, techniques,
-      principles) and write a short summary per topic of what his notes say, in his language, with
-      session dates. Start with the 15 topics with the most tips. Search already shows matching
-      topic summaries first.
-- [x] **Topic index, part 2a.** (v0.2.2) Six more topics (21 in total).
-- [x] **Topic index, part 2b.** (v0.2.3) Five more topics (26 in total).
-- [x] **Topic index, part 2c.** (v0.2.4) Five more topics (31 in total).
+- [ ] **Topic browser** (he asked, 1 Nov). A Topics list in the app, most tips first; tapping one
+      shows the summary and the matching tips with dates. Add a topic filter on Search.
 - [ ] **Topic index, part 2d.** Cover the remaining topics. From then on, each run refreshes only
       the topics that newly filed notes touch.
-- [ ] **Topic browser.** A Topics list in the app (most tips first); tapping one shows the summary
-      and the matching tips with dates. Add a topic filter on the notes list.
 - [ ] **Search synonyms from his notes.** Grow `ALIASES` in `src/search.js` from the spellings he
       actually uses (e.g. halfguard / half guard, sidecontrol, backtake), with tests.
 - [ ] **Pull to refresh and a sync indicator** on every screen.
 
-- [ ] **Rate and compare dictation.** A button to rate each note's dictation and compare the phone keyboard against a second option. Needs the second option first (see proposal below).
-- [ ] **Run now button.** A button that starts the routine immediately. Needs a trigger credential from him first (proposal).
-
 ## Later
 
-- [ ] (proposal, owner said yes if free per use and self-running; needs his pick of service) Better voice dictation than the built-in phone keyboard (for example a speech-to-text service with a BJJ vocabulary). Adds a service and changes capture, so it needs a yes.
-- [ ] (proposal) "Before class" screen: his last 3 sessions plus one older topic to review.
-- [ ] (proposal) Monthly hours and sessions on Home.
+- [ ] "Before class" screen: his last 3 sessions plus one older topic to review. Ask first
+      (`App · Decisions`), since it adds a screen he didn't request.
+- [ ] Monthly hours and sessions on Home.
 
 ## Done
 
+- [x] v0.3.0: Record button (voice notes transcribed by Whisper in the runs, free per use),
+      accuracy rating for typed vs recorded notes, Run now button, decision buttons on Home.
+- [x] v0.2.1-0.2.4: Topic index, parts 1-2c (31 topics with summaries, shown first in Search).
+- [x] v0.2.0: Offline-safe saving (service worker, queued notes).
 - [x] v0.1.0: Log (dictation box, draft kept on the phone), Search (instant keyword search),
       Ask (questions answered at the next run), Home (last run, needs-you, mode, feedback).

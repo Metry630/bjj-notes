@@ -2,9 +2,10 @@ import { store } from './store.js';
 import { makeApi, parseLink } from './api.js';
 import { search, toCells, highlightTerms, norm } from './search.js';
 import { enqueue, flush } from './queue.js';
+import { startRecording, blobToBase64, audioBatches } from './recorder.js';
 import { todayISO, isoToSheetDate, nextRunLabel, hoursSince, shortTime } from './dates.js';
 
-export const VERSION = '0.2.4';
+export const VERSION = '0.3.0';
 
 const TABS = {
   inbox: 'App · Inbox',
@@ -12,11 +13,19 @@ const TABS = {
   feedback: 'App · Feedback',
   log: 'App · Log',
   topics: 'App · Topics',
+  audio: 'App · Audio',
+  decisions: 'App · Decisions',
 };
 const ERRORS = {
   offline: 'No connection.',
   unauthorized: 'This phone link stopped working. Open the link in App · Setup again.',
   not_linked: 'This phone is not linked yet.',
+  no_run_token: 'Run now is not set up yet: it needs the RUN_TOKEN script property.',
+  too_soon: 'A run started less than 10 minutes ago. Give it a moment.',
+  daily_limit: 'That is 8 manual runs today. The next scheduled run will pick things up.',
+  fire_failed_429: "Claude's limit for runs this hour is reached. Try again later.",
+  fire_failed_401: 'The Run now token was replaced or is wrong.',
+  fire_failed_400: 'The routine is paused on claude.ai.',
 };
 const errorText = (e) => ERRORS[e.message] || `Something went wrong (${e.message}).`;
 
@@ -36,6 +45,7 @@ const state = {
   feedback: store.get('feedback', []),
   log: store.get('log', []),
   topics: store.get('topics', []),
+  decisions: store.get('decisions', []),
   queue: store.get('queue', []),
   settings: store.get('settings', { routine_mode: 'normal' }),
   syncedAt: store.get('syncedAt', ''),
@@ -105,6 +115,75 @@ views.log = (root) => {
   for (const el of [date, location, hours, text]) el.addEventListener('input', keep);
 
   const save = h('button', { class: 'primary', type: 'submit' }, 'Save');
+
+  // Record instead of typing: audio goes up in slices, the routine transcribes it with Whisper.
+  let recording = null;
+  let timer = 0;
+  const recBtn = h('button', { class: 'secondary rec', type: 'button' }, 'Record instead');
+  const recCancel = h('button', { class: 'link', type: 'button', hidden: true }, 'Cancel recording');
+  const clock = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+  const resetRec = () => {
+    clearInterval(timer);
+    recording = null;
+    recBtn.textContent = 'Record instead';
+    recBtn.classList.remove('on');
+    recCancel.hidden = true;
+  };
+  recCancel.addEventListener('click', () => {
+    recording?.cancel();
+    resetRec();
+    msg.textContent = 'Recording discarded.';
+  });
+  recBtn.addEventListener('click', async () => {
+    if (!recording) {
+      try {
+        recording = await startRecording();
+      } catch {
+        msg.textContent = 'No microphone access. Allow it for this app in Settings, or use the keyboard mic.';
+        return;
+      }
+      recBtn.classList.add('on');
+      recCancel.hidden = false;
+      const tick = () => (recBtn.textContent = `Stop and save (${clock(Math.round((Date.now() - recording.started) / 1000))})`);
+      tick();
+      timer = setInterval(tick, 1000);
+      msg.textContent = 'Recording. Talk through the session, then tap Stop and save.';
+      return;
+    }
+    const rec = await recording.stop();
+    resetRec();
+    recBtn.disabled = true;
+    try {
+      const d = readForm();
+      const id = uid();
+      const entries = [
+        { tab: TABS.inbox, rows: [{ id, session_date: d.date, location: d.location, hours: d.hours, text: '', method: 'recording' }] },
+        ...audioBatches(id, rec.mime, await blobToBase64(rec.blob)).map((rows) => ({ tab: TABS.audio, rows })),
+      ];
+      let queued = false;
+      for (let i = 0; i < entries.length; i++) {
+        msg.textContent = `Uploading ${clock(rec.seconds)} of audio (${i + 1}/${entries.length})…`;
+        try {
+          await api.call('add', entries[i]);
+        } catch (e) {
+          if (e.message === 'unauthorized') throw e;
+          for (const rest of entries.slice(i)) state.queue = enqueue(state.queue, rest);
+          store.set('queue', state.queue);
+          queued = true;
+          break;
+        }
+      }
+      store.set('last', { location: d.location, hours: d.hours });
+      msg.textContent = queued
+        ? 'Saved on this phone. It uploads when you are back online.'
+        : `Saved ${clock(rec.seconds)} of audio. It gets transcribed and filed at ${runAt()}, or tap Run now on Home.`;
+      queued ? update() : refresh();
+    } catch (e) {
+      msg.textContent = `${errorText(e)} The recording could not be saved.`;
+    } finally {
+      recBtn.disabled = false;
+    }
+  });
   const form = h(
     'form',
     {
@@ -117,7 +196,7 @@ views.log = (root) => {
         try {
           const entry = {
             tab: TABS.inbox,
-            rows: [{ id: d.id, session_date: d.date, location: d.location, hours: d.hours, text: d.text }],
+            rows: [{ id: d.id, session_date: d.date, location: d.location, hours: d.hours, text: d.text, method: 'keyboard' }],
           };
           let queued = false;
           try {
@@ -148,13 +227,43 @@ views.log = (root) => {
     h('datalist', { id: 'locations' }, locations.map((l) => h('option', { value: l }))),
     text,
     save,
+    recBtn,
+    recCancel,
     msg
   );
   root.append(h('h1', null, 'Log a session'), form, list);
 
+  // "How accurate was this?" so typed and recorded notes can be compared on Home.
+  const rateRow = (r) =>
+    h(
+      'div',
+      { class: 'rate' },
+      h('span', { class: 'meta' }, `${r.method === 'recording' ? 'Recorded' : 'Typed'}. Accuracy: `),
+      [1, 2, 3, 4, 5].map((n) =>
+        h(
+          'button',
+          {
+            type: 'button',
+            class: String(r.rating) === String(n) ? 'star on' : 'star',
+            onclick: async () => {
+              r.rating = n;
+              update();
+              try {
+                await api.call('update', { tab: TABS.inbox, id: r.id, fields: { rating: n } });
+                store.set('inbox', state.inbox);
+              } catch (e) {
+                msg.textContent = errorText(e);
+              }
+            },
+          },
+          String(n)
+        )
+      )
+    );
+
   const update = () => {
     const items = newest(state.inbox, 'created_at').filter((r) => r.status !== 'cancelled').slice(0, 8);
-    const queued = state.queue.map((q) => q.rows[0]);
+    const queued = state.queue.filter((q) => q.tab === TABS.inbox).map((q) => q.rows[0]);
     fill(list, queued.length ? h('h2', null, 'Queued on this phone') : '',
       queued.map((r) =>
         h(
@@ -171,7 +280,7 @@ views.log = (root) => {
           'div',
           { class: 'card' },
           h('div', { class: 'meta' }, `${isoToSheetDate(r.session_date) || r.session_date} · ${r.location || 'no gym'} · ${r.hours || '?'} h`),
-          h('p', { class: 'clip' }, r.text),
+          h('p', { class: 'clip' }, r.text || (r.method === 'recording' ? 'Voice note, transcribed at the next run.' : '')),
           r.status === 'new'
             ? h(
                 'div',
@@ -180,7 +289,8 @@ views.log = (root) => {
                 h('button', { class: 'link', onclick: () => cancel(TABS.inbox, r.id) }, 'Cancel')
               )
             : h('div', { class: 'meta ok' }, r.sheet_row ? `Filed in your sheet, row ${r.sheet_row}.` : `Status: ${r.status}.`),
-          r.agent_note ? h('p', { class: 'note' }, r.agent_note) : ''
+          r.agent_note ? h('p', { class: 'note' }, r.agent_note) : '',
+          r.status !== 'new' ? rateRow(r) : ''
         )
       )
     );
@@ -304,10 +414,28 @@ views.home = (root) => {
   const fbSend = h('button', { class: 'primary', type: 'submit' }, 'Send');
   const runs = h('div');
   const stats = h('div');
+  const decisions = h('div');
+  const runMsg = h('p', { class: 'msg', role: 'status' });
+  const runBtn = h('button', { class: 'primary wide', type: 'button' }, 'Run now');
+  runBtn.addEventListener('click', async () => {
+    runBtn.disabled = true;
+    runMsg.textContent = 'Starting…';
+    try {
+      await api.call('runNow');
+      runMsg.textContent = 'Started. New notes, recordings and questions are handled in about 5 minutes. Tap Refresh at the top after that.';
+    } catch (e) {
+      runMsg.textContent = errorText(e);
+    } finally {
+      runBtn.disabled = false;
+    }
+  });
   const fbList = h('div');
   root.append(
     h('h1', null, 'Home'),
+    decisions,
     runs,
+    runBtn,
+    runMsg,
     stats,
     h('h2', null, 'Routine'),
     modes,
@@ -358,7 +486,7 @@ views.home = (root) => {
   const MODE_INFO = {
     normal: 'Files notes, answers questions, then builds one feature.',
     light: 'Only files notes and answers questions.',
-    paused: 'Does nothing until you switch back.',
+    paused: 'Scheduled runs do nothing until you switch back. Run now still works.',
   };
 
   return () => {
@@ -393,10 +521,56 @@ views.home = (root) => {
           )
         : ''
     );
+    const open = state.decisions.filter((d) => d.status === 'open');
+    fill(decisions,
+      open.map((d) =>
+        h(
+          'div',
+          { class: 'card decision' },
+          h('div', { class: 'meta' }, 'Claude needs a decision'),
+          h('p', { class: 'pre' }, d.question),
+          h(
+            'div',
+            { class: 'choices' },
+            String(d.options)
+              .split('|')
+              .map((o) => o.trim())
+              .filter(Boolean)
+              .map((o) =>
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    class: o === String(d.recommended).trim() ? 'primary' : 'secondary',
+                    onclick: async () => {
+                      try {
+                        await api.call('update', { tab: TABS.decisions, id: d.id, fields: { answer: o } });
+                        d.status = 'answered';
+                        d.answer = o;
+                        store.set('decisions', state.decisions);
+                        update();
+                        drawNav();
+                      } catch (e) {
+                        runMsg.textContent = errorText(e);
+                      }
+                    },
+                  },
+                  o === String(d.recommended).trim() ? `${o} (recommended)` : o
+                )
+              )
+          )
+        )
+      )
+    );
     const sessions = state.notes?.rows ?? [];
+    const avg = (method) => {
+      const rated = state.inbox.filter((r) => (r.method || 'keyboard') === method && /^[1-5]$/.test(String(r.rating)));
+      return rated.length ? `${(rated.reduce((a, r) => a + Number(r.rating), 0) / rated.length).toFixed(1)} from ${rated.length}` : 'not rated yet';
+    };
     fill(stats, sessions.length
         ? h('p', { class: 'meta' }, `${state.notes.total_hours || '?'} hours over ${sessions.length} sessions. Last: ${sessions[sessions.length - 1].cells[0]}.`)
-        : ''
+        : '',
+      h('p', { class: 'meta' }, `Dictation accuracy (your ratings): typed ${avg('keyboard')}, recorded ${avg('recording')}.`)
     );
     fill(modes, Object.entries(MODE_INFO).map(([mode, info]) =>
         h(
@@ -485,7 +659,7 @@ function show(view) {
 function drawNav() {
   const seen = new Set(store.get('seenAnswers', []));
   const newAnswers = state.questions.filter((r) => r.status === 'answered' && !seen.has(r.id)).length;
-  const needs = newest(state.log, 'started_at')[0]?.needs_you ? 1 : 0;
+  const needs = state.decisions.filter((d) => d.status === 'open').length || (newest(state.log, 'started_at')[0]?.needs_you ? 1 : 0);
   const items = [
     ['log', 'Log', 0],
     ['search', 'Search', 0],
@@ -518,7 +692,7 @@ async function refresh() {
       store.set('queue', state.queue);
       if (res.error && res.error.message !== 'offline') setStatus(errorText(res.error));
     }
-    const keys = ['notes', 'inbox', 'questions', 'feedback', 'log', 'topics', 'settings'];
+    const keys = ['notes', 'inbox', 'questions', 'feedback', 'log', 'topics', 'settings', 'decisions'];
     const results = await api.batch([
       { action: 'notes' },
       { action: 'get', tab: TABS.inbox },
@@ -527,6 +701,7 @@ async function refresh() {
       { action: 'get', tab: TABS.log },
       { action: 'get', tab: TABS.topics },
       { action: 'settings' },
+      { action: 'get', tab: TABS.decisions },
     ]);
     results.forEach((r, i) => {
       if (!r.ok) return;

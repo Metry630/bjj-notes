@@ -12,10 +12,13 @@
 //   node tools/sheet.mjs append-session session.json   {"date":"YYYY-MM-DD","location","hours","cells":[...]}
 //   node tools/sheet.mjs add "App · Log" rows.json      JSON array of row objects
 //   node tools/sheet.mjs update "App · Inbox" <id> fields.json
+//   node tools/sheet.mjs audio <inbox_id> <out-file>    joins a recording's slices into a file
+//   node tools/sheet.mjs audio-done <inbox_id>          clears its slices once transcribed
+//   node tools/sheet.mjs decisions                      open and newly answered decisions
 //
 // Any *.json argument may be "-" to read from stdin.
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 export function call(action, payload = {}, env = process.env) {
@@ -45,6 +48,20 @@ export function call(action, payload = {}, env = process.env) {
 
 export function formatNotes(res) {
   return res.rows.map((r) => `${r.row}\t${r.cells.slice(0, 3).join('\t')}\t${r.cells.slice(3).join(' | ')}`).join('\n');
+}
+
+// Joins slices 1..total of one recording. Throws if any slice is missing, so a half-uploaded
+// recording is left for the next run.
+export function assembleAudio(rows, inboxId) {
+  const mine = rows.filter((r) => String(r.inbox_id) === String(inboxId) && r.status !== 'done');
+  if (!mine.length) throw new Error(`no audio for ${inboxId}`);
+  const total = Number(mine[0].total);
+  const bySeq = new Map(mine.map((r) => [Number(r.seq), r]));
+  const missing = [];
+  for (let i = 1; i <= total; i++) if (!bySeq.has(i)) missing.push(i);
+  if (missing.length) throw new Error(`incomplete: ${total - missing.length}/${total} slices uploaded`);
+  const b64 = Array.from({ length: total }, (_, i) => String(bySeq.get(i + 1).data)).join('');
+  return { bytes: Buffer.from(b64, 'base64'), mime: String(mine[0].mime), slices: total, rowIds: mine.map((r) => r.id) };
 }
 
 const readJson = (arg) => JSON.parse(arg === '-' ? readFileSync(0, 'utf8') : readFileSync(arg, 'utf8'));
@@ -80,6 +97,18 @@ function main(argv) {
       return print(call('add', { tab: rest[0], rows: readJson(rest[1]) }));
     case 'update':
       return print(call('update', { tab: rest[0], id: rest[1], fields: readJson(rest[2]) }));
+    case 'audio': {
+      const a = assembleAudio(call('get', { tab: 'App · Audio' }).rows, rest[0]);
+      writeFileSync(rest[1], a.bytes);
+      return print({ file: rest[1], bytes: a.bytes.length, mime: a.mime, slices: a.slices });
+    }
+    case 'audio-done': {
+      const rows = call('get', { tab: 'App · Audio' }).rows.filter((r) => String(r.inbox_id) === rest[0]);
+      for (const r of rows) call('update', { tab: 'App · Audio', id: r.id, fields: { data: '', status: 'done' } });
+      return print({ cleared: rows.length });
+    }
+    case 'decisions':
+      return print(call('get', { tab: 'App · Decisions' }).rows.filter((r) => r.status === 'open' || (r.status === 'answered' && !r.acted_at)));
     default:
       process.stderr.write('usage: see the header of tools/sheet.mjs\n');
       process.exit(2);

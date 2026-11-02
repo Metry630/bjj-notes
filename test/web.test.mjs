@@ -130,3 +130,29 @@ test('queue stops at the first failure and keeps the rest', async () => {
   assert.deepEqual(res.left.map((e) => e.rows[0].id), ['b', 'c']);
   assert.equal(res.error.message, 'offline');
 });
+
+// ---- v0.3: recordings ----
+import { slices, audioBatches, pickMime } from '../src/recorder.js';
+import { assembleAudio } from '../tools/sheet.mjs';
+
+test('recordings are sliced into cell-sized parts and batched 10 per request', () => {
+  const b64 = 'A'.repeat(30000 * 12 + 5);
+  assert.equal(slices(b64).length, 13);
+  const batches = audioBatches('n1', 'audio/mp4; codecs=mp4a.40.2', b64);
+  assert.deepEqual(batches.map((b) => b.length), [10, 3]);
+  assert.deepEqual(batches[0][0], { id: 'n1-1', inbox_id: 'n1', seq: 1, total: 13, mime: 'audio/mp4;codecs=mp4a.40.2', data: 'A'.repeat(30000) });
+  assert.equal(batches[1][2].seq, 13);
+  assert.equal(pickMime((t) => t === 'audio/webm;codecs=opus'), 'audio/webm;codecs=opus');
+  assert.equal(pickMime(() => false), '');
+});
+
+test('the routine joins slices back into the original bytes, and refuses a partial upload', () => {
+  const bytes = Buffer.from('hello voice note, synthetic bytes only');
+  const b64 = bytes.toString('base64');
+  const rows = audioBatches('n1', 'audio/mp4', b64).flat().map((r) => ({ ...r, data: r.data }));
+  const split = slices(b64, 8).map((data, i, all) => ({ id: `n1-${i + 1}`, inbox_id: 'n1', seq: i + 1, total: all.length, mime: 'audio/mp4', data }));
+  assert.deepEqual(assembleAudio([...split].reverse(), 'n1').bytes, bytes);
+  assert.deepEqual(assembleAudio(rows, 'n1').bytes, bytes);
+  assert.throws(() => assembleAudio(split.slice(1), 'n1'), /incomplete: \d+\/\d+/);
+  assert.throws(() => assembleAudio(split, 'other'), /no audio/);
+});

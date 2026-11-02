@@ -101,9 +101,10 @@ export function sampleSheet1({ dates = 'text' } = {}) {
   return sh;
 }
 
-export function loadCodeGs({ sheet1 = sampleSheet1() } = {}) {
+export function loadCodeGs({ sheet1 = sampleSheet1(), fireStatus = 200 } = {}) {
   const props = new Map();
   const ss = new FakeSpreadsheet([sheet1]);
+  const fired = [];
   const context = {
     SpreadsheetApp: { getActiveSpreadsheet: () => ss, CopyPasteType: { PASTE_FORMAT: 'PASTE_FORMAT' } },
     PropertiesService: {
@@ -117,11 +118,20 @@ export function loadCodeGs({ sheet1 = sampleSheet1() } = {}) {
       MimeType: { JSON: 'json' },
       createTextOutput: (s) => ({ s, setMimeType() { return this; }, getContent() { return this.s; } }),
     },
-    Utilities: { getUuid: () => randomUUID() },
+    Utilities: {
+      getUuid: () => randomUUID(),
+      formatDate: (d, tz) => new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(d),
+    },
+    UrlFetchApp: {
+      fetch: (url, opts) => {
+        fired.push({ url, opts });
+        return { getResponseCode: () => fireStatus };
+      },
+    },
   };
   vm.createContext(context);
   vm.runInContext(`${CODE}\n;this.__api = { doPost, doGet, setup, rotateTokens };`, context);
   const api = context.__api;
   const post = (body) => JSON.parse(api.doPost({ postData: { contents: JSON.stringify(body) }, parameter: {} }).getContent());
-  return { api, post, props, ss, sheet1 };
+  return { api, post, props, ss, sheet1, fired };
 }

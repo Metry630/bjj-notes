@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0 (2026-11-02)
+
+- Record button on Log: voice notes upload in slices and are transcribed with Whisper in the next run (free per use).
+- Rate each filed note 1-5; Home compares typed and recorded accuracy.
+- Run now button on Home (Apps Script calls the routine's API trigger, max once per 10 minutes, 8 a day).
+- Decisions show as buttons on Home; the routine decides small things itself.
+
 ## 0.2.4 (2026-11-02)
 
 - Topic index, part 2c: 5 more topics (31 in total).

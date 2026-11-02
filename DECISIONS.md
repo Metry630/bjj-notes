@@ -35,3 +35,18 @@ Claude limit on churn. Home has a mode switch (normal / light / paused) if the l
 
 **Public repo, private data.** Code is public like his other side projects. A pre-push check
 (`tools/check-public.mjs`) fails if a diff contains note text, the token or the API URL.
+
+**Voice notes are transcribed by Whisper inside the routine.** Apple dictation is poor at his
+Indonesian/English mix. Whisper (large-v3-turbo, CPU) handles code-switching better, takes a
+vocabulary prompt built from his own notes, and costs nothing per use because it runs in the
+scheduled VM. The audio travels as base64 slices in a hidden tab, so no new storage or scope.
+The trade-off: a recording is filed at the next run, or within minutes via Run now.
+
+**Run now goes through Apps Script.** The routine's API token can only start this one routine. It
+sits in Script Properties, the phone never sees it, and the script allows one fire per 10 minutes
+and 8 a day so a stuck button can't eat his plan. A manual run only does chores, never features.
+
+**Decisions are buttons, not conversations.** The routine decides anything free and reversible
+itself. Only money, new credentials, data rewrites or an Apps Script redeploy become a question,
+always with options and a recommendation, answered with one tap on Home.
+

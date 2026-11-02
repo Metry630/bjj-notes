@@ -170,3 +170,80 @@ test('bad JSON and GET are refused without touching data', () => {
   assert.deepEqual(JSON.parse(api.doPost({ postData: { contents: '{nope' } }).getContent()), { ok: false, error: 'bad_json' });
   assert.deepEqual(JSON.parse(api.doGet().getContent()), { ok: false, error: 'post_only' });
 });
+
+// ---- v2: recordings, ratings, decisions, run now ----
+
+const b64 = Buffer.from('fake audio bytes').toString('base64');
+
+test('phone uploads recording slices; bad slices are refused', () => {
+  const { post, phone, ss } = ready();
+  post({ action: 'add', tab: 'App · Inbox', rows: [{ id: 'rec1', session_date: '2026-11-02', text: '', method: 'recording' }], token: phone });
+  const res = post({
+    action: 'add',
+    tab: 'App · Audio',
+    rows: [1, 2].map((seq) => ({ id: `rec1-${seq}`, inbox_id: 'rec1', seq, total: 2, mime: 'audio/mp4', data: b64 })),
+    token: phone,
+  });
+  assert.equal(res.ok, true);
+  assert.equal(ss.getSheetByName('App · Audio').getLastRow(), 3);
+  const bad = (row) => post({ action: 'add', tab: 'App · Audio', rows: [{ inbox_id: 'rec1', seq: 1, total: 1, mime: 'audio/mp4', data: b64, ...row }], token: phone }).error;
+  assert.equal(bad({ mime: 'text/html' }), 'bad_audio');
+  assert.equal(bad({ data: '<script>' }), 'bad_audio');
+  assert.equal(bad({ seq: 3, total: 2 }), 'bad_audio');
+  assert.equal(bad({ data: 'A'.repeat(40001) }), 'bad_audio');
+  assert.equal(post({ action: 'add', tab: 'App · Inbox', rows: [{ text: 'x', method: 'telepathy' }], token: phone }).error, 'bad_method');
+});
+
+test('inbox tabs from v1 gain method and rating columns', () => {
+  const { post, phone, ss } = ready();
+  const inbox = ss.getSheetByName('App · Inbox');
+  inbox.getRange(1, 11, 1, 2).setValues([['', '']]); // simulate a v1 header without the new columns
+  post({ action: 'add', tab: 'App · Inbox', rows: [{ id: 'k1', text: 'typed', method: 'keyboard' }], token: phone });
+  const [row] = post({ action: 'get', tab: 'App · Inbox', token: phone }).rows;
+  assert.equal(row.method, 'keyboard');
+});
+
+test('phone rates a filed note at any time, 1 to 5 only', () => {
+  const { post, phone, agent } = ready();
+  post({ action: 'add', tab: 'App · Inbox', rows: [{ id: 'n1', text: 'x', method: 'keyboard' }], token: phone });
+  post({ action: 'update', tab: 'App · Inbox', id: 'n1', fields: { status: 'processed', sheet_row: 7 }, token: agent });
+  assert.equal(post({ action: 'update', tab: 'App · Inbox', id: 'n1', fields: { rating: 4 }, token: phone }).ok, true);
+  assert.equal(post({ action: 'update', tab: 'App · Inbox', id: 'n1', fields: { rating: 9 }, token: phone }).error, 'bad_rating');
+  assert.equal(post({ action: 'update', tab: 'App · Inbox', id: 'n1', fields: { rating: 3, text: 'edit' }, token: phone }).error, 'already_processed');
+  assert.equal(post({ action: 'get', tab: 'App · Inbox', token: phone }).rows[0].rating, '4');
+});
+
+test('phone answers an open decision with one of its options, once', () => {
+  const { post, phone, agent } = ready();
+  post({ action: 'add', tab: 'App · Decisions', rows: [{ id: 'd1', question: 'Model?', options: 'Fast | Accurate', recommended: 'Accurate', status: 'open' }], token: agent });
+  assert.equal(post({ action: 'add', tab: 'App · Decisions', rows: [{ question: 'x' }], token: phone }).error, 'forbidden');
+  assert.equal(post({ action: 'update', tab: 'App · Decisions', id: 'd1', fields: { answer: 'Maybe' }, token: phone }).error, 'bad_answer');
+  assert.equal(post({ action: 'update', tab: 'App · Decisions', id: 'd1', fields: { status: 'answered' }, token: phone }).error, 'forbidden_field');
+  assert.equal(post({ action: 'update', tab: 'App · Decisions', id: 'd1', fields: { answer: 'Accurate' }, token: phone }).ok, true);
+  const [d] = post({ action: 'get', tab: 'App · Decisions', token: phone }).rows;
+  assert.equal(d.status, 'answered');
+  assert.equal(d.answer, 'Accurate');
+  assert.equal(post({ action: 'update', tab: 'App · Decisions', id: 'd1', fields: { answer: 'Fast' }, token: phone }).error, 'already_answered');
+});
+
+test('run now: phone only, needs the token, fires once per 10 minutes', () => {
+  const env = ready();
+  const { post, phone, agent, props, fired } = env;
+  assert.equal(post({ action: 'runNow', token: agent }).error, 'forbidden');
+  assert.equal(post({ action: 'runNow', token: phone }).error, 'no_run_token');
+  props.set('RUN_TOKEN', 'sk-ant-oat01-test');
+  const res = post({ action: 'runNow', token: phone });
+  assert.deepEqual([res.ok, res.fired, res.runs_today], [true, true, 1]);
+  assert.match(fired[0].url, /\/v1\/claude_code\/routines\/trig_\w+\/fire$/);
+  assert.equal(fired[0].opts.headers.Authorization, 'Bearer sk-ant-oat01-test');
+  assert.equal(post({ action: 'runNow', token: phone }).error, 'too_soon');
+  assert.equal(fired.length, 1);
+  assert.equal(post({ action: 'batch', calls: [{ action: 'runNow' }], token: phone }).results[0].error, 'batch_is_read_only');
+});
+
+test('run now reports Anthropic errors and does not count them', () => {
+  const env = ready({ fireStatus: 429 });
+  env.props.set('RUN_TOKEN', 'sk-ant-oat01-test');
+  assert.equal(env.post({ action: 'runNow', token: env.phone }).error, 'fire_failed_429');
+  assert.equal(env.props.get('RUN_COUNT'), undefined);
+});

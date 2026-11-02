@@ -6,12 +6,15 @@
  * Install: Extensions > Apps Script in "BJJ Lesson Tracker", paste this file, run setup() once,
  * then Deploy > New deployment > Web app (Execute as: Me, Who has access: Anyone) and paste the
  * /exec URL into App · Setup!B3.
+ * Update: paste, save, run setup(), then Deploy > Manage deployments > edit (pencil) >
+ * Version: New version > Deploy. The URL stays the same.
  *
  * Enforced here rather than by convention:
  * - Sheet1 is append-only: appendSession (agent token) adds a row; no action edits or deletes one.
  * - Only "App · *" tabs are read or written, never "App · Setup" (it shows the tokens).
- * - Phone token: read, add to Inbox/Questions/Feedback, edit or cancel its own items while they
- *   are still "new", set the routine mode. Agent token: reads, appendSession, any other App tab.
+ * - Phone token: read, add to Inbox/Questions/Feedback/Audio, edit or cancel its own items while
+ *   they are still "new", rate a filed note, answer an open decision, set the routine mode, and
+ *   start a run (runNow). Agent token: reads, appendSession, any other App tab. It can't start runs.
  *
  * Every response is HTTP 200 JSON; check `ok`. Token goes in the JSON body (`token`) or as ?k=.
  */
@@ -25,14 +28,27 @@ const TABS = {
   'App · Questions': ['id', 'asked_at', 'question', 'status', 'answer', 'sources', 'answered_at'],
   'App · Feedback': ['id', 'created_at', 'text', 'status', 'reply', 'replied_at'],
   'App · Log': ['id', 'started_at', 'finished_at', 'mode', 'summary', 'shipped', 'needs_you'],
+  'App · Audio': ['id', 'created_at', 'inbox_id', 'seq', 'total', 'mime', 'data', 'status'],
+  'App · Decisions': ['id', 'created_at', 'question', 'options', 'recommended', 'status', 'answer', 'answered_at'],
 };
+TABS['App · Inbox'] = TABS['App · Inbox'].concat(['method', 'rating']);
 // What the phone may set on its own rows; everything else is server- or agent-set.
 const PHONE_FIELDS = {
-  'App · Inbox': ['session_date', 'location', 'hours', 'text'],
+  'App · Inbox': ['session_date', 'location', 'hours', 'text', 'method'],
   'App · Questions': ['question'],
   'App · Feedback': ['text'],
+  'App · Audio': ['inbox_id', 'seq', 'total', 'mime', 'data'],
 };
-const CREATED_FIELD = { 'App · Inbox': 'created_at', 'App · Questions': 'asked_at', 'App · Feedback': 'created_at' };
+// Fields the phone may change at any time, not only while an item is still "new".
+const PHONE_ANYTIME = { 'App · Inbox': ['rating'] };
+const DECISIONS_TAB = APP + 'Decisions';
+const METHODS = ['keyboard', 'recording'];
+const CREATED_FIELD = { 'App · Inbox': 'created_at', 'App · Questions': 'asked_at', 'App · Feedback': 'created_at', 'App · Audio': 'created_at' };
+// Run now: the routine's API trigger. Its token (sk-ant-oat01-...) lives in Script Properties as
+// RUN_TOKEN and can only start this one routine.
+const FIRE_URL = 'https://api.anthropic.com/v1/claude_code/routines/trig_01Afu9HT6okM7SGULQsYokWm/fire';
+const RUN_GAP_MINUTES = 10;
+const RUNS_PER_DAY = 8;
 const MODES = ['normal', 'light', 'paused'];
 const READ_ACTIONS = ['ping', 'notes', 'get', 'settings'];
 const MAX_TEXT = 40000; // a cell holds 50k chars
@@ -75,6 +91,9 @@ function handle_(role, req) {
     case 'appendSession':
       if (role !== 'agent') throw new Error('forbidden');
       return withLock_(function () { return appendSession_(req); });
+    case 'runNow':
+      if (role !== 'phone') throw new Error('forbidden'); // the routine never starts itself
+      return withLock_(runNow_);
     default:
       throw new Error('unknown_action');
   }
@@ -193,6 +212,7 @@ function add_(role, tab, rows) {
   if (role === 'phone' && !PHONE_FIELDS[tab]) throw new Error('forbidden');
   const sh = ensureTab_(tab, role === 'agent' ? Object.keys(rows[0] || {}) : null);
   let header = header_(sh);
+  if (TABS[tab]) header = growHeader_(sh, header, TABS[tab]); // tabs from an older version gain columns
   const ids = idIndex_(sh, header);
   return {
     added: rows.map(function (input) {
@@ -217,17 +237,31 @@ function update_(role, tab, id, fields) {
   const sh = ss_().getSheetByName(tab);
   if (!sh) throw new Error('no_such_tab');
   let header = header_(sh);
+  if (TABS[tab]) header = growHeader_(sh, header, TABS[tab]);
   const r = idIndex_(sh, header)[String(id)];
   if (!r) throw new Error('no_such_id');
-  const keys = Object.keys(fields).filter(function (k) { return k !== 'id' && k !== '_row'; });
+  let keys = Object.keys(fields).filter(function (k) { return k !== 'id' && k !== '_row'; });
   if (role === 'phone') {
-    if (!PHONE_FIELDS[tab]) throw new Error('forbidden');
-    if (rowObject_(sh, r, header).status !== 'new') throw new Error('already_processed');
-    const allowed = PHONE_FIELDS[tab].concat(['status']);
-    keys.forEach(function (k) {
-      if (allowed.indexOf(k) < 0) throw new Error('forbidden_field');
-      if (k === 'status' && fields[k] !== 'cancelled') throw new Error('forbidden_status');
-    });
+    const current = rowObject_(sh, r, header);
+    const anytime = PHONE_ANYTIME[tab] || [];
+    if (tab === DECISIONS_TAB) {
+      if (keys.length !== 1 || keys[0] !== 'answer') throw new Error('forbidden_field');
+      if (current.status !== 'open') throw new Error('already_answered');
+      const options = String(current.options).split('|').map(function (o) { return o.trim(); });
+      if (options.indexOf(String(fields.answer)) < 0) throw new Error('bad_answer');
+      fields = { answer: String(fields.answer), status: 'answered', answered_at: new Date().toISOString() };
+      keys = Object.keys(fields);
+    } else if (keys.length && keys.every(function (k) { return anytime.indexOf(k) >= 0; })) {
+      if (keys.indexOf('rating') >= 0 && !/^[1-5]$/.test(String(fields.rating))) throw new Error('bad_rating');
+    } else {
+      if (!PHONE_FIELDS[tab]) throw new Error('forbidden');
+      if (current.status !== 'new') throw new Error('already_processed');
+      const allowed = PHONE_FIELDS[tab].concat(['status']);
+      keys.forEach(function (k) {
+        if (allowed.indexOf(k) < 0) throw new Error('forbidden_field');
+        if (k === 'status' && fields[k] !== 'cancelled') throw new Error('forbidden_status');
+      });
+    }
   } else {
     header = growHeader_(sh, header, keys);
   }
@@ -256,8 +290,47 @@ function phoneRow_(tab, input) {
   PHONE_FIELDS[tab].forEach(function (k) {
     if (input && input[k] != null) row[k] = input[k];
   });
+  if (row.method != null && METHODS.indexOf(row.method) < 0) throw new Error('bad_method');
+  if (tab === 'App · Audio') checkAudio_(row);
   row.status = 'new';
   return row;
+}
+
+// One base64 slice of a recording: the routine joins slices 1..total of an inbox item.
+function checkAudio_(row) {
+  const seq = Number(row.seq);
+  const total = Number(row.total);
+  const data = String(row.data || '');
+  const ok =
+    row.inbox_id && /^audio\/[\w.+-]+(;[\w=.,-]+)?$/.test(String(row.mime || '')) &&
+    /^[A-Za-z0-9+\/=]+$/.test(data) && data.length <= MAX_TEXT &&
+    Math.floor(seq) === seq && Math.floor(total) === total && seq >= 1 && seq <= total && total <= 500;
+  if (!ok) throw new Error('bad_audio');
+}
+
+// Starts the routine now. Rate-limited here as well as by Anthropic, since every run uses his plan.
+function runNow_() {
+  const props = PropertiesService.getScriptProperties();
+  const token = props.getProperty('RUN_TOKEN');
+  if (!token) throw new Error('no_run_token');
+  const now = Date.now();
+  if (now - Number(props.getProperty('RUN_LAST') || 0) < RUN_GAP_MINUTES * 60000) throw new Error('too_soon');
+  const day = Utilities.formatDate(new Date(now), 'Asia/Singapore', 'yyyy-MM-dd');
+  const count = props.getProperty('RUN_DAY') === day ? Number(props.getProperty('RUN_COUNT') || 0) : 0;
+  if (count >= RUNS_PER_DAY) throw new Error('daily_limit');
+  const res = UrlFetchApp.fetch(FIRE_URL, {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + token, 'anthropic-version': '2026-10-21' },
+    payload: JSON.stringify({ text: 'Manual run from the app.' }),
+    muteHttpExceptions: true,
+  });
+  const code = res.getResponseCode();
+  if (code !== 200) throw new Error('fire_failed_' + code);
+  props.setProperty('RUN_LAST', String(now));
+  props.setProperty('RUN_DAY', day);
+  props.setProperty('RUN_COUNT', String(count + 1));
+  return { fired: true, runs_today: count + 1 };
 }
 
 function appTab_(name) {
@@ -320,7 +393,10 @@ function writeRow_(sh, r, header, row) {
 // ---- setup (run from the editor) ----
 
 function setup() {
-  Object.keys(TABS).forEach(function (t) { ensureTab_(t, null); });
+  Object.keys(TABS).forEach(function (t) {
+    const sh = ensureTab_(t, null);
+    growHeader_(sh, header_(sh), TABS[t]);
+  });
   const props = PropertiesService.getScriptProperties();
   if (!props.getProperty('PHONE_TOKEN') || !props.getProperty('AGENT_TOKEN')) newTokens_(props);
   if (!props.getProperty('ROUTINE_MODE')) props.setProperty('ROUTINE_MODE', 'normal');
@@ -365,7 +441,8 @@ function writeSetup_(totalNote) {
   const props = PropertiesService.getScriptProperties();
   const url = String(sh.getRange(3, 2).getValue() || '');
   const note = totalNote == null ? String(sh.getRange(8, 2).getValue() || '') : totalNote;
-  sh.getRange(1, 1, 10, 2).setValues([
+  sh.getRange(5, 2).setNumberFormat('@');
+  sh.getRange(1, 1, 11, 2).setValues([
     ['BJJ notes app', 'Keep this tab private. It is as sensitive as the notes themselves.'],
     ['', ''],
     ['1. Web app URL', url],
@@ -376,6 +453,7 @@ function writeSetup_(totalNote) {
     ['Total hours formula', note],
     ['', ''],
     ['If a token leaks', 'Extensions > Apps Script > run rotateTokens, then redo steps 2 and 3.'],
+    ['Run now button', props.getProperty('RUN_TOKEN') ? 'Ready.' : 'Not set up: add Script property RUN_TOKEN (Apps Script > Project Settings).'],
   ]);
   sh.getRange(4, 2).setFormula(
     '=IF(B3="","Paste the web app URL into B3 first","' + PAGES_URL + '#api="&ENCODEURL(B3)&"&k=' +
