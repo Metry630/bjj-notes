@@ -63,7 +63,8 @@ for something you could decide, and never answer a request with a question.
      can't recover becomes `[?]`. Look at a few recent `notes` rows first to match length and style.
    - If `notes` already has a row with the same date (he typed it by hand), still append, but with
      hours blank (`""`) so total hours don't double, and say so in the log.
-   - Items whose text starts with `TEST`: don't touch Sheet1. Put the cells you would have written
+   - Items whose text starts with "test" in any case (a recording that opens with "test" counts):
+     don't touch Sheet1. Put the cells you would have written
      into the item's `agent_note` and mark it `test`.
    - Mark each item: `update "App · Inbox" <id>` with `{status: "processed", sheet_row, processed_at}`.
 7. **Questions.** `node tools/sheet.mjs questions`. Answer each from his notes only (`notes`, plus
