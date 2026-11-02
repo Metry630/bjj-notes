@@ -44,8 +44,9 @@ for something you could decide, and never answer a request with a question.
    - `node tools/sheet.mjs audio <id> /tmp/<id>.audio`. If it says `incomplete`, the phone is
      still uploading: leave the item for the next run (after 24 h, set `agent_note` to say the
      upload never finished and mark it `failed`).
-   - Once per run: `pip install -q faster-whisper`. Then
-     `python3 tools/transcribe.py /tmp/<id>.audio --prompt "<terms>"`, where `<terms>` is ~40 BJJ
+   - Once per run, in a venv (the VM has two Pythons, and bare `pip` installs into the wrong one):
+     `python3 -m venv /tmp/whisper && /tmp/whisper/bin/pip install -q faster-whisper`. Then
+     `/tmp/whisper/bin/python tools/transcribe.py /tmp/<id>.audio --prompt "<terms>"`, where `<terms>` is ~40 BJJ
      terms and spellings that appear most in his notes (positions, techniques, his slang like kalo,
      gw, lu). The model (large-v3-turbo) downloads from huggingface.co on first use.
    - `update` the item's `text` with the raw transcript (that's the record of what he said), then

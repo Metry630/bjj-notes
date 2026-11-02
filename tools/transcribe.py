@@ -2,8 +2,10 @@
 """Transcribe a voice note with Whisper (faster-whisper, CPU, int8). Free per use: it runs inside
 the routine's cloud VM. Prints the transcript to stdout and timing to stderr.
 
-    pip install -q faster-whisper     # once per run; the model downloads from huggingface.co
-    python3 tools/transcribe.py note.m4a --prompt "spider guard, de la riva, kalo, gw, lu"
+    python3 -m venv /tmp/whisper && /tmp/whisper/bin/pip install -q faster-whisper   # once per run
+    /tmp/whisper/bin/python tools/transcribe.py note.m4a --prompt "spider guard, de la riva, kalo, gw, lu"
+
+The model downloads from huggingface.co on first use (allowed in the bjj-access environment).
 
 --language defaults to "id": his notes mix Indonesian and English, and Whisper in Indonesian mode
 keeps English BJJ terms, especially when the prompt lists them. Try --language en if a note is
