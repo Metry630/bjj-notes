@@ -156,3 +156,36 @@ test('the routine joins slices back into the original bytes, and refuses a parti
   assert.throws(() => assembleAudio(split.slice(1), 'n1'), /incomplete: \d+\/\d+/);
   assert.throws(() => assembleAudio(split, 'other'), /no audio/);
 });
+
+import { gymOf, latestYear, keywords, byGym } from '../src/analysis.js';
+
+test('analysis: sessions since 1 October of the latest year count as the current gym', () => {
+  const rows = [
+    { row: 1, cells: ['30/9/26', 'Gym A', '2', 'x'] },
+    { row: 2, cells: ['1/10/26', 'Gym A', '1.5', 'x'] },
+    { row: 3, cells: ['5/11/26', '', '1', 'x'] },
+    { row: 4, cells: ['1/10/25', 'Gym B', '2', 'x'] },
+  ];
+  assert.equal(latestYear(rows), 2026);
+  assert.deepEqual(rows.map((r) => gymOf(r.cells, 2026)), ['Gym A', 'GB SG', 'GB SG', 'Gym B']);
+});
+
+test('analysis: hours and sessions add up per gym, blank hours count as zero', () => {
+  const g = byGym({
+    rows: [
+      { row: 1, cells: ['1/1/25', 'Gym A', '2', 'a'] },
+      { row: 2, cells: ['2/1/25', 'Gym A', '', 'b'] },
+      { row: 3, cells: ['3/1/25', 'Gym B', '1.5', 'c', 'd'] },
+    ],
+  });
+  assert.deepEqual(g.map((x) => [x.name, x.hours, x.sessions, x.tipCount]), [['Gym A', 2, 2, 2], ['Gym B', 1.5, 1, 2]]);
+});
+
+test('analysis: keywords count once per tip, merge spellings, skip filler', () => {
+  const k = keywords(['dlr hook and the sweep sweep', 'delariva sweep', 'kalo armbar', 'armbar finish']);
+  assert.deepEqual(k, [
+    { word: 'sweep', count: 2 },
+    { word: 'arm bar', count: 2 },
+    { word: 'de la riva', count: 2 },
+  ].sort((a, b) => b.count - a.count || a.word.localeCompare(b.word)));
+});

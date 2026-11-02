@@ -5,7 +5,8 @@ His requests (from `App · Feedback`) always go above your own items.
 
 ## Up next
 
-- [ ] **Analysis page** (he asked, 2 Nov). New screen: hours per gym, most common keywords per gym,
+- [ ] **Analysis page, part 2: fun facts only** (part 1 shipped in 0.4.0)
+      Original request: (he asked, 2 Nov). New screen: hours per gym, most common keywords per gym,
       fun facts (longest streak, busiest month, most drilled topic, etc.). Reading chosen: every
       session since 1 October of the latest year counts as the gym he named for that period, as a
       display rule in the app only (Sheet1 rows are never edited). Ship as part 1 (hours and

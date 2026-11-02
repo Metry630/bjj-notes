@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0 (2026-11-03)
+
+- New Stats screen: hours, sessions and most common words per gym. Sessions since 1 October show as GB SG there.
+
 ## 0.3.1 (2026-11-02)
 
 - Rows marked hidden (cleanup at his request) no longer show anywhere in the app.

@@ -1,11 +1,12 @@
 import { store } from './store.js';
 import { makeApi, parseLink } from './api.js';
 import { search, toCells, highlightTerms, norm } from './search.js';
+import { byGym } from './analysis.js';
 import { enqueue, flush } from './queue.js';
 import { startRecording, blobToBase64, audioBatches } from './recorder.js';
 import { todayISO, isoToSheetDate, nextRunLabel, hoursSince, shortTime } from './dates.js';
 
-export const VERSION = '0.3.1';
+export const VERSION = '0.4.0';
 
 const TABS = {
   inbox: 'App · Inbox',
@@ -610,6 +611,27 @@ async function cancel(tab, id) {
   refresh();
 }
 
+views.analysis = (root) => {
+  const out = h('div');
+  root.append(h('h1', null, 'Analysis'), out);
+  return () => {
+    const gyms = byGym(state.notes);
+    if (!gyms.length) return fill(out, h('p', { class: 'meta' }, 'No notes loaded yet.'));
+    fill(out,
+      h('p', { class: 'meta' }, 'Hours and common words per gym. Sessions since 1 October count as GB SG here; your sheet is unchanged.'),
+      gyms.map((g) =>
+        h('div', { class: 'card' },
+          h('strong', null, g.name),
+          h('div', { class: 'meta' }, `${g.hours} hours · ${g.sessions} sessions · ${g.tipCount} tips`),
+          g.keywords.length
+            ? h('p', null, g.keywords.map((k) => `${k.word} (${k.count})`).join(', '))
+            : h('p', { class: 'meta' }, 'Not enough notes for common words yet.')
+        )
+      )
+    );
+  };
+};
+
 // ---- shell ----
 
 const main = document.getElementById('main');
@@ -664,6 +686,7 @@ function drawNav() {
     ['log', 'Log', 0],
     ['search', 'Search', 0],
     ['ask', 'Ask', newAnswers],
+    ['analysis', 'Stats', 0],
     ['home', 'Home', needs],
   ];
   fill(nav, items.map(([v, label, badge]) =>
