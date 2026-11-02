@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.4 (2026-11-02)
+
+- Topic index, part 2c: 5 more topics (31 in total).
+
 ## 0.2.3 (2026-11-02)
 
 - Topic index, part 2b: 5 more topics (26 in total).

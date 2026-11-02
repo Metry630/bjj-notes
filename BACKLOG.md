@@ -15,7 +15,8 @@ Items marked (proposal) need a yes from him in `App · Feedback` before they're 
       topic summaries first.
 - [x] **Topic index, part 2a.** (v0.2.2) Six more topics (21 in total).
 - [x] **Topic index, part 2b.** (v0.2.3) Five more topics (26 in total).
-- [ ] **Topic index, part 2c.** Cover the remaining topics. From then on, each run refreshes only
+- [x] **Topic index, part 2c.** (v0.2.4) Five more topics (31 in total).
+- [ ] **Topic index, part 2d.** Cover the remaining topics. From then on, each run refreshes only
       the topics that newly filed notes touch.
 - [ ] **Topic browser.** A Topics list in the app (most tips first); tapping one shows the summary
       and the matching tips with dates. Add a topic filter on the notes list.
