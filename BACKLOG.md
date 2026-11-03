@@ -5,6 +5,10 @@ His requests (from `App · Feedback`) always go above your own items.
 
 ## Up next
 
+- [x] **Date picker defaults to today** (he asked, 3 Nov). Shipped 0.4.2.
+- [ ] **File the 3 Nov notes** (he asked, 3 Nov). Two recordings and one typed note are in the Inbox
+      (transcribed, dated 3 Nov). Combine them into one Sheet1 row once the sheet's append works
+      again (it errored on 4 Nov and left two empty 3/11/26 rows in Sheet1).
 - [ ] **Multi-recording sessions** (he asked, 3 Nov). Let him record several voice notes in a row
       (pause, continue later) and send them as one session: record, keep, record, keep, then send.
       The kept parts are filed together as one Sheet1 row with the hours counted once. Reading
