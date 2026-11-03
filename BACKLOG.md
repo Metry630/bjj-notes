@@ -5,6 +5,12 @@ His requests (from `App · Feedback`) always go above your own items.
 
 ## Up next
 
+- [ ] **Multi-recording sessions** (he asked, 3 Nov). Let him record several voice notes in a row
+      (pause, continue later) and send them as one session: record, keep, record, keep, then send.
+      The kept parts are filed together as one Sheet1 row with the hours counted once. Reading
+      chosen: a local "kept parts" list in the record screen, uploaded as inbox items with the same
+      session date and location, hours only on the first. Until it ships, recordings with the same
+      session date and location are already combined into one row by the run protocol.
 - [x] **Stats: topics, not filler words** (he asked, 3 Nov). Shipped 0.4.1: curated list of guards,
       positions and techniques counted per gym.
 - [ ] **Analysis page, part 2: fun facts only** (part 1 shipped in 0.4.0)
