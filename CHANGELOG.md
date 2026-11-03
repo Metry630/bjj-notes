@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.2 (2026-11-04)
+
+- The date on the Log screen is always today unless a note is half written. It resets after sending.
+
 ## 0.4.1 (2026-11-03)
 
 - Stats screen now lists topics (guards, positions, techniques) per gym instead of common words.

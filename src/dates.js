@@ -7,6 +7,11 @@ export function todayISO(now = new Date()) {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
+// A saved draft keeps its date only while it holds unsent text; otherwise the date is today.
+export function draftDate(draft, now = new Date()) {
+  return draft && draft.text && draft.date ? draft.date : todayISO(now);
+}
+
 // "27/10/24" -> "2024-10-27"; anything else -> "".
 export function sheetDateToISO(s) {
   const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/.exec(String(s).trim());

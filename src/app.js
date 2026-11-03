@@ -4,9 +4,9 @@ import { search, toCells, highlightTerms, norm } from './search.js';
 import { byGym } from './analysis.js';
 import { enqueue, flush } from './queue.js';
 import { startRecording, blobToBase64, audioBatches } from './recorder.js';
-import { todayISO, isoToSheetDate, nextRunLabel, hoursSince, shortTime } from './dates.js';
+import { todayISO, draftDate, isoToSheetDate, nextRunLabel, hoursSince, shortTime } from './dates.js';
 
-export const VERSION = '0.4.1';
+export const VERSION = '0.4.2';
 
 const TABS = {
   inbox: 'App · Inbox',
@@ -98,6 +98,7 @@ views.log = (root) => {
   const lastRow = sessions[sessions.length - 1]?.cells ?? [];
   const last = store.get('last', { location: lastRow[1] || '', hours: lastRow[2] || '' });
   const draft = store.get('draft', null) || { id: uid(), date: todayISO(), location: last.location, hours: last.hours, text: '' };
+  draft.date = draftDate(draft);
   const locations = [...new Set(sessions.map((r) => r.cells[1]).filter(Boolean).reverse())];
 
   const date = h('input', { type: 'date', value: draft.date, required: true });
@@ -211,6 +212,7 @@ views.log = (root) => {
           store.set('last', { location: d.location, hours: d.hours });
           draft.id = uid();
           text.value = '';
+          date.value = todayISO();
           keep();
           msg.textContent = queued
             ? 'No connection. Your note is queued on this phone and goes out when you are back online.'

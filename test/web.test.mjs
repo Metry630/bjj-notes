@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { search, toCells, expand, queryTerms, highlightTerms } from '../src/search.js';
-import { todayISO, sheetDateToISO, isoToSheetDate, nextRunLabel, hoursSince } from '../src/dates.js';
+import { draftDate, todayISO, sheetDateToISO, isoToSheetDate, nextRunLabel, hoursSince } from '../src/dates.js';
 import { parseLink, makeApi } from '../src/api.js';
 import { findLeaks, shingles, addedLines } from '../tools/check-public.mjs';
 
@@ -188,4 +188,11 @@ test('analysis: topics count once per tip, merge spellings, ignore filler words'
     { word: 'de la riva', count: 2 },
     { word: 'sweep', count: 1 },
   ]);
+});
+
+test('draftDate keeps the date only for an unsent draft', () => {
+  const now = new Date(2026, 10, 3);
+  assert.equal(draftDate({ date: '2026-10-31', text: 'x' }, now), '2026-10-31');
+  assert.equal(draftDate({ date: '2026-10-31', text: '' }, now), '2026-11-03');
+  assert.equal(draftDate(null, now), '2026-11-03');
 });
