@@ -157,7 +157,7 @@ test('the routine joins slices back into the original bytes, and refuses a parti
   assert.throws(() => assembleAudio(split, 'other'), /no audio/);
 });
 
-import { gymOf, latestYear, keywords, byGym } from '../src/analysis.js';
+import { gymOf, latestYear, topics, byGym } from '../src/analysis.js';
 
 test('analysis: sessions since 1 October of the latest year count as the current gym', () => {
   const rows = [
@@ -181,11 +181,11 @@ test('analysis: hours and sessions add up per gym, blank hours count as zero', (
   assert.deepEqual(g.map((x) => [x.name, x.hours, x.sessions, x.tipCount]), [['Gym A', 2, 2, 2], ['Gym B', 1.5, 1, 2]]);
 });
 
-test('analysis: keywords count once per tip, merge spellings, skip filler', () => {
-  const k = keywords(['dlr hook and the sweep sweep', 'delariva sweep', 'kalo armbar', 'armbar finish']);
+test('analysis: topics count once per tip, merge spellings, ignore filler words', () => {
+  const k = topics(['dlr hook and the sweep sweep', 'delariva then kalo armbar', 'armbar finish', 'okay jadi langsung gitu']);
   assert.deepEqual(k, [
-    { word: 'sweep', count: 2 },
     { word: 'arm bar', count: 2 },
     { word: 'de la riva', count: 2 },
-  ].sort((a, b) => b.count - a.count || a.word.localeCompare(b.word)));
+    { word: 'sweep', count: 1 },
+  ]);
 });

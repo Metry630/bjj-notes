@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1 (2026-11-03)
+
+- Stats screen now lists topics (guards, positions, techniques) per gym instead of common words.
+
 ## 0.4.0 (2026-11-03)
 
 - New Stats screen: hours, sessions and most common words per gym. Sessions since 1 October show as GB SG there.

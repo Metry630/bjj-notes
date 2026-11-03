@@ -6,7 +6,7 @@ import { enqueue, flush } from './queue.js';
 import { startRecording, blobToBase64, audioBatches } from './recorder.js';
 import { todayISO, isoToSheetDate, nextRunLabel, hoursSince, shortTime } from './dates.js';
 
-export const VERSION = '0.4.0';
+export const VERSION = '0.4.1';
 
 const TABS = {
   inbox: 'App · Inbox',
@@ -618,14 +618,14 @@ views.analysis = (root) => {
     const gyms = byGym(state.notes);
     if (!gyms.length) return fill(out, h('p', { class: 'meta' }, 'No notes loaded yet.'));
     fill(out,
-      h('p', { class: 'meta' }, 'Hours and common words per gym. Sessions since 1 October count as GB SG here; your sheet is unchanged.'),
+      h('p', { class: 'meta' }, 'Hours and most covered topics per gym. Sessions since 1 October count as GB SG here; your sheet is unchanged.'),
       gyms.map((g) =>
         h('div', { class: 'card' },
           h('strong', null, g.name),
           h('div', { class: 'meta' }, `${g.hours} hours · ${g.sessions} sessions · ${g.tipCount} tips`),
-          g.keywords.length
-            ? h('p', null, g.keywords.map((k) => `${k.word} (${k.count})`).join(', '))
-            : h('p', { class: 'meta' }, 'Not enough notes for common words yet.')
+          g.topics.length
+            ? h('p', null, g.topics.map((k) => `${k.word} (${k.count})`).join(', '))
+            : h('p', { class: 'meta' }, 'No topics found in these notes yet.')
         )
       )
     );

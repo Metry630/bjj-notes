@@ -1,23 +1,29 @@
 // Numbers and keywords per gym, computed on the phone from the cached notes. Pure functions.
 import { sheetDateToISO } from './dates.js';
-import { ALIASES, norm } from './search.js';
+import { norm } from './search.js';
 
 // Display rule (his request): from 1 October of the latest year in the notes, sessions count
 // as this gym, whatever the row says. Sheet1 itself is never edited.
 export const CURRENT_GYM = 'GB SG';
 
-export const STOPWORDS = new Set(
-  ('the a an and or but to of in on at for with from by is are was be it its this that these those you your ' +
-    'if then than so as not no do does dont can cant just more less very too also into out up down over ' +
-    'when where what how why who which while after before again keep make get got go going put take ' +
-    'yang dan di ke itu ini aja ya sih dong nih deh lu gw gue aku dia dari buat untuk kalo kalau kalo ' +
-    'pake pakai sama sm jg juga udah udh baru terus trus lagi bisa bs ga gak gk gabisa gbs bisa ' +
-    'sampe sampai habis abis dulu dlu sblm biar supaya kan banget bgt kyk kayak gitu gini ada ' +
-    'tapi tp atau ato satu dua tangan kaki pas waktu lawan orang cuma cuman jangan jgn harus ' +
-    'ke dalem dalam atas bawah depan belakang lalu terus tadi nanti kalau mau krn karena ' +
-    'one two same side other first back')
-    .split(' ')
-);
+// Positions, guards and techniques worth counting (his request: topics, not filler words).
+// Each entry is a group of spellings; the first is the name shown. Matching is on whole words.
+export const TOPICS = [
+  ['spider guard', 'spider'], ['de la riva', 'dlr', 'delariva'], ['reverse de la riva', 'rdlr'],
+  ['half guard', 'halfguard'], ['deep half'], ['knee shield'], ['z guard'], ['lockdown'],
+  ['closed guard', 'full guard', 'fullguard'], ['open guard'], ['butterfly guard', 'butterfly'],
+  ['x guard'], ['single leg x', 'slx'], ['lasso'], ['collar sleeve', 'collar and sleeve'], ['rubber guard'],
+  ['side control', 'sidecontrol'], ['mount'], ['knee on belly', 'kob', 'knee on stomach'],
+  ['back take', 'backtake', 'back control'], ['turtle'], ['north south'], ['kesa gatame'],
+  ['arm drag', 'armdrag'], ['single leg'], ['double leg'], ['takedown'], ['guard pass', 'passing', 'pass'],
+  ['sweep'], ['scissor sweep'], ['hip bump'], ['berimbolo'], ['leg drag'], ['torreando'], ['knee slice', 'knee cut'],
+  ['triangle'], ['arm bar', 'armbar'], ['kimura'], ['americana'], ['omoplata'], ['guillotine'],
+  ['rear naked choke', 'rnc'], ['cross collar choke', 'cross choke'], ['bow and arrow'], ['ezekiel'],
+  ['darce', 'd arce'], ['anaconda'], ['heel hook'], ['kneebar'], ['straight ankle lock', 'ankle lock'],
+  ['leg lock', 'leglock'], ['choke'], ['shrimp', 'hip escape'], ['bridge'], ['frames', 'frame'],
+  ['underhook'], ['overhook'], ['grip', 'grips'], ['posture'], ['escape'], ['transition'],
+  ['body lock'], ['crab ride'], ['truck'], ['twister'], ['wrestle up'],
+];
 
 // Which gym a session counts as. cells: [date, location, hours, ...]; sinceYear: latest year.
 export function gymOf(cells, sinceYear) {
@@ -35,32 +41,19 @@ export function latestYear(rows) {
   return max;
 }
 
-// Merge spellings from ALIASES into the first phrase, so "dlr" and "delariva" count together.
-function canonical(text) {
-  let s = ` ${norm(text)} `;
-  for (const [main, ...others] of ALIASES) {
-    for (const o of others) s = s.split(` ${o} `).join(` ${main} `);
-  }
-  for (const [main] of ALIASES) s = s.split(` ${main} `).join(` ${main.replace(/ /g, '_')} `);
-  return s.trim();
-}
-
-// Count each word once per tip, so one long tip does not drown the rest.
-export function keywords(tips, limit = 10) {
+// Count each topic once per tip, merging spellings, so one long tip does not drown the rest.
+export function topics(tips, limit = 10) {
   const counts = new Map();
   for (const tip of tips) {
-    const seen = new Set(
-      canonical(tip)
-        .split(' ')
-        .filter((w) => w.length >= 4 && !STOPWORDS.has(w) && !/^\d+$/.test(w))
-    );
-    for (const w of seen) counts.set(w, (counts.get(w) || 0) + 1);
+    const hay = ` ${norm(tip)} `;
+    for (const [name, ...others] of TOPICS) {
+      if ([name, ...others].some((p) => hay.includes(` ${p} `))) counts.set(name, (counts.get(name) || 0) + 1);
+    }
   }
   return [...counts]
-    .filter(([, n]) => n >= 2)
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .slice(0, limit)
-    .map(([word, count]) => ({ word: word.replace(/_/g, ' '), count }));
+    .map(([word, count]) => ({ word, count }));
 }
 
 // notes: the API response ({rows:[{row, cells}]}). Returns gyms, most hours first.
@@ -77,6 +70,6 @@ export function byGym(notes) {
     gyms.set(name, g);
   }
   return [...gyms.values()]
-    .map(({ tips, ...g }) => ({ ...g, tipCount: tips.length, keywords: keywords(tips) }))
+    .map(({ tips, ...g }) => ({ ...g, tipCount: tips.length, topics: topics(tips) }))
     .sort((a, b) => b.hours - a.hours);
 }
