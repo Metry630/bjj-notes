@@ -47,14 +47,27 @@ export async function startRecording() {
   const release = () => stream.getTracks().forEach((t) => t.stop());
   return {
     started,
+    // Resolves once with what was recorded, even if the phone already ended the recording (screen
+    // lock, mic taken by a call) so rec.stop() throws or onstop never fires.
     stop: () =>
-      new Promise((resolve) => {
-        rec.onstop = () => {
+      new Promise((resolve, reject) => {
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
           release();
           const mime = rec.mimeType || wanted || 'audio/mp4';
+          if (!chunks.length) return reject(new Error('empty'));
           resolve({ blob: new Blob(chunks, { type: mime }), mime, seconds: Math.round((Date.now() - started) / 1000) });
         };
-        rec.stop();
+        if (rec.state === 'inactive') return finish();
+        rec.onstop = finish;
+        try {
+          rec.stop();
+        } catch {
+          finish();
+        }
+        setTimeout(finish, 4000);
       }),
     cancel: () => {
       rec.onstop = null;

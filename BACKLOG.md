@@ -5,6 +5,11 @@ His requests (from `App · Feedback`) always go above your own items.
 
 ## Up next
 
+- [x] **Fix Stop and save on the record screen** (he asked, 4 Nov). Shipped 0.4.3. Likely cause:
+      the phone ends the recording (lock, call) and stop never finished. Part 2 is the usability item.
+- [ ] **Voice recording usability** (he asked, 4 Nov). Recording is clumsy to use, he would rather
+      type in the sheet. Reading chosen: review the whole record flow (start, pause, stop, save,
+      feedback on screen, errors) and remove friction, keeping the old way working.
 - [x] **Date picker defaults to today** (he asked, 3 Nov). Shipped 0.4.2.
 - [ ] **File the 3 Nov notes** (he asked, 3 Nov). Two recordings and one typed note are in the Inbox
       (transcribed, dated 3 Nov). Combine them into one Sheet1 row once the sheet's append works

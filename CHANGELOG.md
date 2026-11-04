@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.3 (2026-11-05)
+
+- Stop and save on the record screen no longer hangs when the phone already ended the recording. It saves what was captured, or says no audio was captured.
+
 ## 0.4.2 (2026-11-04)
 
 - The date on the Log screen is always today unless a note is half written. It resets after sending.

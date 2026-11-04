@@ -6,7 +6,7 @@ import { enqueue, flush } from './queue.js';
 import { startRecording, blobToBase64, audioBatches } from './recorder.js';
 import { todayISO, draftDate, isoToSheetDate, nextRunLabel, hoursSince, shortTime } from './dates.js';
 
-export const VERSION = '0.4.2';
+export const VERSION = '0.4.3';
 
 const TABS = {
   inbox: 'App · Inbox',
@@ -152,9 +152,18 @@ views.log = (root) => {
       msg.textContent = 'Recording. Talk through the session, then tap Stop and save.';
       return;
     }
-    const rec = await recording.stop();
-    resetRec();
     recBtn.disabled = true;
+    msg.textContent = 'Stopping…';
+    let rec;
+    try {
+      rec = await recording.stop();
+    } catch {
+      resetRec();
+      recBtn.disabled = false;
+      msg.textContent = 'No audio was captured. The phone may have stopped the mic. Tap Record instead to try again.';
+      return;
+    }
+    resetRec();
     try {
       const d = readForm();
       const id = uid();
