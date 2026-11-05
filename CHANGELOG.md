@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.4 (2026-11-05)
+
+- Sheet script fix: adding a session to Sheet1 no longer stops half way when the new row has a dropdown rule. Needs the updated script pasted into Apps Script and redeployed.
+
 ## 0.4.3 (2026-11-05)
 
 - Stop and save on the record screen no longer hangs when the phone already ended the recording. It saves what was captured, or says no audio was captured.

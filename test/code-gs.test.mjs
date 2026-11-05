@@ -121,6 +121,14 @@ test('appendSession appends one row and leaves every existing row untouched (tex
   assert.equal(sheet1.peek(7, 4).fmt, '@');
 });
 
+test('appendSession still writes the whole row when the new row has a data-validation rule', () => {
+  const { post, agent, sheet1 } = ready();
+  for (let c = 1; c <= 6; c++) sheet1.cell(7, c).dv = true;
+  const res = post({ action: 'appendSession', date: '2026-10-31', location: 'New Gym', hours: 1, cells: ['a'], token: agent });
+  assert.deepEqual(res, { ok: true, row: 7 });
+  assert.deepEqual(sheet1.getRange(7, 1, 1, 4).getValues()[0], ['31/10/26', 'New Gym', 1, 'a']);
+});
+
 test('appendSession writes a day serial in the copied date format when dates are real dates', () => {
   const { post, agent, sheet1 } = ready({ sheet1: sampleSheet1({ dates: 'date' }) });
   sheet1.cell(6, 1).fmt = 'd/m/yy';

@@ -62,10 +62,11 @@ class FakeRange {
   getValue() { return this.sheet.peek(this.r, this.c).v; }
   getFormula() { return this.sheet.peek(this.r, this.c).f; }
   setFormula(f) { this.sheet.cell(this.r, this.c).f = f; return this; }
-  setValue(v) { const x = this.sheet.cell(this.r, this.c); x.v = v; x.f = ''; return this; }
+  clearDataValidations() { this.each((r, c) => { this.sheet.cell(r, c).dv = false; }); return this; }
+  setValue(v) { const x = this.sheet.cell(this.r, this.c); if (x.dv) throw new Error('data validation'); x.v = v; x.f = ''; return this; }
   setValues(vals) {
     if (vals.length !== this.nr || vals.some((row) => row.length !== this.nc)) throw new Error('setValues shape mismatch');
-    this.each((r, c, i, j) => { const x = this.sheet.cell(r, c); x.v = vals[i][j]; x.f = ''; });
+    this.each((r, c, i, j) => { const x = this.sheet.cell(r, c); if (x.dv) throw new Error('data validation'); x.v = vals[i][j]; x.f = ''; });
     return this;
   }
   setNumberFormat(fmt) { this.each((r, c) => { this.sheet.cell(r, c).fmt = fmt; }); return this; }

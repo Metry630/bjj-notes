@@ -171,6 +171,8 @@ function appendSession_(req) {
   // Same look as the previous session row (wrap, fonts, date format).
   sh.getRange(last, 1, 1, width).copyTo(sh.getRange(r, 1, 1, width), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
 
+  // A dropdown rule on a column (e.g. a gym list) must not reject a new value half way through a row.
+  sh.getRange(r, 1, 1, width).clearDataValidations();
   const dateCell = sh.getRange(r, 1);
   if (isDate_(sh.getRange(last, 1).getValue())) {
     // A day serial in the copied date format: no script-vs-sheet time zone shift.
