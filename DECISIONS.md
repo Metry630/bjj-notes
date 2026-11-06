@@ -5,10 +5,16 @@ Why it's built this way, short enough to defend in a room.
 **The sheet stays the source of truth.** Two years of notes already live there, and he still types
 into it by hand sometimes. The app adds tabs and appends rows; it never moves the notes elsewhere.
 
-**Apps Script is the only door, and Sheet1 is append-only by construction.** An agent runs
-unattended twice a day. Rather than trusting it not to damage the notes, the API it talks to has no
-action that edits or deletes a Sheet1 row (tested in `test/code-gs.test.mjs`). `@OnlyCurrentDoc`
-limits the script to this one spreadsheet. No Google Cloud project or service-account key needed.
+**Apps Script is the only door, and it can't damage a filled cell.** An agent runs unattended twice
+a day. Rather than trusting it, the API has no action that changes or deletes a cell that has
+something in it (tested in `test/code-gs.test.mjs`). Saves fill empty cells only: a day's notes go
+into that day's row, his own included, so one session stays one row. The single delete removes a
+row holding nothing but a date. `@OnlyCurrentDoc` limits the script to this one spreadsheet.
+
+**A save is all or nothing.** Sheets checks dropdown rules when changes are flushed, so the first
+version wrote a date, had the gym rejected afterwards, and left a date-only row on every retry
+(six of them in Nov 2026). Now each save widens the dropdown for that cell, flushes inside the
+call, and clears what it wrote if anything fails.
 
 **Two tokens.** The phone token can read and add notes/questions/feedback. The routine's token can
 also append session rows and write the app tabs. Either can be rotated alone (`rotateTokens()`).

@@ -19,9 +19,11 @@ for something you could decide, and never answer a request with a question.
   It reads `BJJ_API_URL` and `BJJ_AGENT_TOKEN` from the environment. Never print, echo, log or
   commit either value, and never pass the token on a command line.
 - `Sheet1` holds his notes: header row `Date | Location | Hours | Techniques/Tips`, a `Total:` row,
-  then one row per session, one technique/tip per cell from column D. Sheet1 is append-only for
-  you: `append-session` adds a row; nothing can edit or delete his rows. Don't try to work around
-  that, and don't ask him to loosen it.
+  then one row per session, one technique/tip per cell from column D. He also types rows himself,
+  often with Location blank. Nothing you can call changes or deletes a cell that has something in
+  it; that is enforced by the script, so don't try to work around it or ask him to loosen it.
+  `file-session` is how notes get in (below). `inspect <row>` shows a row's formats and validation
+  rules when something looks off.
 - Your tabs: `App · Inbox` (dictated notes), `App · Questions`, `App · Feedback`, `App · Log`, and
   any other `App · *` tab you create (e.g. `App · Topics`). `App · Setup` is off limits.
 - The app is static files on GitHub Pages (this repo, branch `main`, root). A push to `main` is a
@@ -55,19 +57,29 @@ for something you could decide, and never answer a request with a question.
      log. Put the model and the seconds it took in the log summary, so the choice can be judged
      against his accuracy ratings (Home shows typed vs recorded).
 6. **Inbox → Sheet1.** `node tools/sheet.mjs inbox` lists `status: new` items.
-   - Group items by `session_date` (+ location). Several items for one session become one row.
-   - Write one `append-session` per session: `{date: "YYYY-MM-DD", location, hours, cells: [...]}`.
+   - Group items by `session_date`. Several items (clips) for one session become one call:
+     `file-session` with `{date: "YYYY-MM-DD", location, hours, cells: [...]}`. If a row for that
+     date exists (he started it, or an earlier clip was filed), the script fills only its empty
+     cells: location and hours if blank, tips after his last tip. Otherwise it adds a row in date
+     order. Hours are one session's hours, never summed across clips.
+   - Location: since October 2026 everything is at "GB SG" unless the item says otherwise.
    - Cells: **his words, his language.** He writes casual Indonesian/English mix ("kalo kena mount,
      ..."). Keep that. Only: fix misheard BJJ terms (Della Riva -> de la riva, half gourd -> half
      guard), drop filler (um, "okay so"), split into one technique/topic per cell, in the order he
      said them. Never translate, never add a technique, detail or advice he didn't say. A word you
      can't recover becomes `[?]`. Look at a few recent `notes` rows first to match length and style.
-   - If `notes` already has a row with the same date (he typed it by hand), still append, but with
-     hours blank (`""`) so total hours don't double, and say so in the log.
+   - If `file-session` fails, the script has already undone it (no junk row). Don't retry in the
+     same run: leave the items `new`, put the error in their `agent_note` and in the log summary,
+     and run `inspect` on the target row to see why. The next run tries once more. Only after two
+     runs fail the same way, add a decision for him with what you found.
+   - `prune-row <row> <date>` deletes a row holding nothing but a date. It exists to clean up rows
+     left by the old save bug (before 6 Nov 2026). Never use it on anything else.
    - Items whose text starts with "test" in any case (a recording that opens with "test" counts):
      don't touch Sheet1. Put the cells you would have written
      into the item's `agent_note` and mark it `test`.
    - Mark each item: `update "App · Inbox" <id>` with `{status: "processed", sheet_row, processed_at}`.
+   - Speed matters: right after he records, the app starts a manual run so the note is filed within
+     minutes. In a manual run, do recordings, inbox and questions first, then stop.
 7. **Questions.** `node tools/sheet.mjs questions`. Answer each from his notes only (`notes`, plus
    `App · Topics` if it exists). Answer in the language he asked in, short (a few sentences or a
    short list), quote his own key lines, and cite session dates in `sources` (e.g.

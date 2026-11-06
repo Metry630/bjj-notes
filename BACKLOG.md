@@ -11,15 +11,13 @@ His requests (from `App · Feedback`) always go above your own items.
       type in the sheet. Reading chosen: review the whole record flow (start, pause, stop, save,
       feedback on screen, errors) and remove friction, keeping the old way working.
 - [x] **Date picker defaults to today** (he asked, 3 Nov). Shipped 0.4.2.
-- [ ] **File the 3 Nov notes** (he asked, 3 Nov). Waiting for him to redeploy the 0.4.4 sheet script. Two recordings and one typed note are in the Inbox
-      (transcribed, dated 3 Nov). Combine them into one Sheet1 row once the sheet's append works
-      again (it errored on 4 Nov and left two empty 3/11/26 rows in Sheet1).
-- [ ] **Multi-recording sessions** (he asked, 3 Nov). Let him record several voice notes in a row
-      (pause, continue later) and send them as one session: record, keep, record, keep, then send.
-      The kept parts are filed together as one Sheet1 row with the hours counted once. Reading
-      chosen: a local "kept parts" list in the record screen, uploaded as inbox items with the same
-      session date and location, hours only on the first. Until it ships, recordings with the same
-      session date and location are already combined into one row by the run protocol.
+- [ ] **File the 3 Nov notes** (he asked, 3 Nov). Blocked until the 0.5.0 sheet script is
+      deployed. Then `file-session` puts the two recordings and the typed note into his own
+      3/11/26 row (he started it with 1 hour), as tips after nothing, location GB SG. Once filed,
+      check this off and say so in the log.
+- [x] **Multi-recording sessions** (he asked, 3 Nov). Shipped 0.5.0: record as many clips as you
+      like (pause/continue inside a clip too); each day's clips show as one card and `file-session`
+      puts them into that day's single row with the hours counted once.
 - [x] **Stats: topics, not filler words** (he asked, 3 Nov). Shipped 0.4.1: curated list of guards,
       positions and techniques counted per gym.
 - [ ] **Analysis page, part 2: fun facts only** (part 1 shipped in 0.4.0)
@@ -28,13 +26,9 @@ His requests (from `App · Feedback`) always go above your own items.
       session since 1 October of the latest year counts as the gym he named for that period, as a
       display rule in the app only (Sheet1 rows are never edited). Ship as part 1 (hours and
       keywords per gym), then fun facts as part 2.
-- [ ] **Clean up test items** (he asked, 2 Nov). Wait until the TEST recording (inbox id starting
-      `4c23bbcf`) has been transcribed and its preview has been visible since at least the
-      previous run. Then set `hidden: "yes"` on: every `App · Inbox` row with status `test`, the
-      `App · Log` rows `run-20261031T1346` and every row with mode `manual` started on 2026-11-02,
-      and make sure that recording's audio slices are cleared (`audio-done`). Check Sheet1 for
-      rows that aren't real sessions (none known as of 2 Nov) and report, don't touch. Reply in
-      the log when done.
+- [x] **Clean up test items** (he asked, 2 Nov). Done 6 Nov: test notes and test runs hidden.
+      Sheet1 had four date-only 3/11/26 rows from the old save bug; removed with `prune-row`
+      once the 0.5.0 script is live.
 - [ ] **Topic browser** (he asked, 1 Nov). A Topics list in the app, most tips first; tapping one
       shows the summary and the matching tips with dates. Add a topic filter on Search.
 - [ ] **Topic index, part 2d.** Cover the remaining topics. From then on, each run refreshes only

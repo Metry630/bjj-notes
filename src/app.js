@@ -6,7 +6,7 @@ import { enqueue, flush } from './queue.js';
 import { startRecording, blobToBase64, audioBatches } from './recorder.js';
 import { todayISO, draftDate, isoToSheetDate, nextRunLabel, hoursSince, shortTime } from './dates.js';
 
-export const VERSION = '0.4.5';
+export const VERSION = '0.5.0';
 
 const TABS = {
   inbox: 'App · Inbox',
@@ -93,10 +93,57 @@ function highlighted(text, q) {
 
 const views = {};
 
+// ---- Log: record first, type second. Saving files the note on its own within minutes. ----
+
+const clock = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+// 09:00-18:00 Singapore is his quiet time: nothing starts a run by itself then.
+const quietNow = (now = new Date()) => {
+  const hr = new Date(now.getTime() + 8 * 3600e3).getUTCHours();
+  return hr >= 9 && hr < 18;
+};
+
+let poll = 0;
+// While a run is filing his note, check back every 30 s (only while the app is open).
+function startPolling(minutes = 15) {
+  clearInterval(poll);
+  const until = Date.now() + minutes * 60000;
+  poll = setInterval(() => {
+    if (Date.now() > until || !state.inbox.some((r) => r.status === 'new')) {
+      clearInterval(poll);
+      poll = 0;
+      return;
+    }
+    if (document.visibilityState === 'visible') refresh();
+  }, 30000);
+}
+
+// Starts a run so new notes are filed now. `auto` = right after a save, which waits in quiet time.
+async function fileNow(msg, { auto = false } = {}) {
+  if (auto && quietNow()) {
+    msg.textContent = `Saved. It gets filed at ${runAt()} (quiet hours), or tap File now.`;
+    return;
+  }
+  try {
+    await api.call('runNow');
+    store.set('runStartedAt', new Date().toISOString());
+    msg.textContent = 'Saved. Filing it now: it shows up below, in your sheet, in about 3 minutes.';
+    startPolling();
+  } catch (e) {
+    if (e.message === 'too_soon') {
+      msg.textContent = 'Saved. A run is already going. If it misses this one, tap File now in a few minutes.';
+      startPolling();
+    } else {
+      msg.textContent = `Saved, but filing could not start: ${errorText(e)}`;
+    }
+  }
+}
+
+const filingNow = () => hoursSince(store.get('runStartedAt', '')) < 0.25;
+
 views.log = (root) => {
   const sessions = state.notes?.rows ?? [];
   const lastRow = sessions[sessions.length - 1]?.cells ?? [];
-  const last = store.get('last', { location: lastRow[1] || '', hours: lastRow[2] || '' });
+  const last = store.get('last', { location: lastRow[1] || 'GB SG', hours: lastRow[2] || '1' });
   const draft = store.get('draft', null) || { id: uid(), date: todayISO(), location: last.location, hours: last.hours, text: '' };
   draft.date = draftDate(draft);
   const locations = [...new Set(sessions.map((r) => r.cells[1]).filter(Boolean).reverse())];
@@ -104,60 +151,71 @@ views.log = (root) => {
   const date = h('input', { type: 'date', value: draft.date, required: true });
   const location = h('input', { type: 'text', value: draft.location, list: 'locations', autocomplete: 'off', placeholder: 'Gym' });
   const hours = h('input', { type: 'number', value: draft.hours, step: '0.25', min: '0', max: '12', inputmode: 'decimal' });
-  const text = h('textarea', {
-    rows: '10',
-    value: draft.text,
-    placeholder: 'Tap the mic on your keyboard and talk: what you drilled, what worked, what to fix. Indonesian or English, whatever comes out.',
-  });
   const msg = h('p', { class: 'msg', role: 'status' });
   const list = h('div');
-
   const readForm = () => ({ id: draft.id, date: date.value, location: location.value.trim(), hours: hours.value, text: text.value });
   const keep = () => store.set('draft', readForm());
-  for (const el of [date, location, hours, text]) el.addEventListener('input', keep);
 
-  const save = h('button', { class: 'primary', type: 'submit' }, 'Save');
+  // Sends entries in order; whatever can't go out (no signal) waits in the phone's queue.
+  async function send(entries, label) {
+    for (let i = 0; i < entries.length; i++) {
+      if (label) msg.textContent = `${label} (${i + 1}/${entries.length})…`;
+      try {
+        await api.call('add', entries[i]);
+      } catch (e) {
+        if (e.message === 'unauthorized') throw e;
+        for (const rest of entries.slice(i)) state.queue = enqueue(state.queue, rest);
+        store.set('queue', state.queue);
+        return false;
+      }
+    }
+    return true;
+  }
 
-  // Record instead of typing: audio goes up in slices, the routine transcribes it with Whisper.
+  // -- recorder --
   let recording = null;
   let timer = 0;
-  const recBtn = h('button', { class: 'secondary rec', type: 'button' }, 'Record instead');
-  const recCancel = h('button', { class: 'link', type: 'button', hidden: true }, 'Cancel recording');
-  const recPause = h('button', { class: 'secondary', type: 'button', hidden: true }, 'Pause');
-  let cancelArmed = 0;
-  const clock = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
-  const resetRec = () => {
+  let cancelArmed = false;
+  const recBtn = h('button', { class: 'recbig', type: 'button', 'aria-label': 'Record' }, 'Record');
+  const recTime = h('div', { class: 'rectime', hidden: true }, '0:00');
+  const recPause = h('button', { class: 'secondary', type: 'button' }, 'Pause');
+  const recCancel = h('button', { class: 'secondary', type: 'button' }, 'Cancel');
+  const recRow = h('div', { class: 'recrow', hidden: true }, recPause, recCancel);
+  const recHint = h('p', { class: 'meta center' }, 'Tap and talk through the session. Pause any time. Stop saves it and files it into your sheet.');
+
+  const idle = () => {
     clearInterval(timer);
     recording = null;
-    recBtn.textContent = 'Record instead';
+    cancelArmed = false;
+    recBtn.textContent = 'Record';
     recBtn.classList.remove('on');
-    recCancel.hidden = true;
-    recCancel.textContent = 'Cancel recording';
-    cancelArmed = 0;
-    recPause.hidden = true;
+    recBtn.disabled = false;
+    recTime.hidden = true;
+    recRow.hidden = true;
     recPause.textContent = 'Pause';
+    recCancel.textContent = 'Cancel';
+    recHint.hidden = false;
   };
   recPause.addEventListener('click', () => {
     if (!recording) return;
     if (recording.paused) {
       if (recording.resume()) {
         recPause.textContent = 'Pause';
-        msg.textContent = 'Recording again.';
+        recTime.classList.remove('paused');
       }
     } else if (recording.pause()) {
       recPause.textContent = 'Continue';
-      msg.textContent = 'Paused. Tap Continue to keep going, or Stop and save.';
+      recTime.classList.add('paused');
     }
   });
   recCancel.addEventListener('click', () => {
-    // Two taps, so a slip does not throw away a long recording.
     if (!cancelArmed) {
-      cancelArmed = 1;
+      cancelArmed = true;
       recCancel.textContent = 'Tap again to discard';
       return;
     }
     recording?.cancel();
-    resetRec();
+    idle();
     msg.textContent = 'Recording discarded.';
   });
   recBtn.addEventListener('click', async () => {
@@ -165,62 +223,67 @@ views.log = (root) => {
       try {
         recording = await startRecording();
       } catch {
-        msg.textContent = 'No microphone access. Allow it for this app in Settings, or use the keyboard mic.';
+        msg.textContent = 'No microphone access. Allow the microphone for this app in Settings, or type it below.';
         return;
       }
+      recBtn.textContent = 'Stop';
       recBtn.classList.add('on');
-      recCancel.hidden = false;
-      recPause.hidden = false;
-      const tick = () => (recBtn.textContent = `Stop and save (${clock(recording.elapsed())})`);
+      recTime.hidden = false;
+      recRow.hidden = false;
+      recHint.hidden = true;
+      msg.textContent = '';
+      const tick = () => (recTime.textContent = clock(recording.elapsed()));
       tick();
-      timer = setInterval(tick, 1000);
-      msg.textContent = 'Recording. Talk through the session, then tap Stop and save.';
+      timer = setInterval(tick, 500);
       return;
     }
     recBtn.disabled = true;
-    msg.textContent = 'Stopping…';
+    msg.textContent = 'Saving…';
     let rec;
     try {
       rec = await recording.stop();
     } catch {
-      resetRec();
-      recBtn.disabled = false;
-      msg.textContent = 'No audio was captured. The phone may have stopped the mic. Tap Record instead to try again.';
+      idle();
+      msg.textContent = 'No audio was captured (the phone stopped the mic). Tap Record to try again.';
       return;
     }
-    resetRec();
+    idle();
+    recBtn.disabled = true;
     try {
       const d = readForm();
       const id = uid();
-      const entries = [
-        { tab: TABS.inbox, rows: [{ id, session_date: d.date, location: d.location, hours: d.hours, text: '', method: 'recording' }] },
-        ...audioBatches(id, rec.mime, await blobToBase64(rec.blob)).map((rows) => ({ tab: TABS.audio, rows })),
-      ];
-      let queued = false;
-      for (let i = 0; i < entries.length; i++) {
-        msg.textContent = `Uploading ${clock(rec.seconds)} of audio (${i + 1}/${entries.length})…`;
-        try {
-          await api.call('add', entries[i]);
-        } catch (e) {
-          if (e.message === 'unauthorized') throw e;
-          for (const rest of entries.slice(i)) state.queue = enqueue(state.queue, rest);
-          store.set('queue', state.queue);
-          queued = true;
-          break;
-        }
-      }
+      const sent = await send(
+        [
+          { tab: TABS.inbox, rows: [{ id, session_date: d.date, location: d.location, hours: d.hours, text: '', method: 'recording' }] },
+          ...audioBatches(id, rec.mime, await blobToBase64(rec.blob)).map((rows) => ({ tab: TABS.audio, rows })),
+        ],
+        `Saving ${clock(rec.seconds)} of audio`
+      );
       store.set('last', { location: d.location, hours: d.hours });
-      msg.textContent = queued
-        ? 'Saved on this phone. It uploads when you are back online.'
-        : `Saved ${clock(rec.seconds)} of audio. It gets transcribed and filed at ${runAt()}, or tap Run now on Home.`;
-      queued ? update() : refresh();
+      if (!sent) {
+        msg.textContent = 'No connection. The recording is safe on this phone and uploads when you are back online.';
+        update();
+      } else {
+        await refresh();
+        await fileNow(msg, { auto: true });
+        update();
+      }
     } catch (e) {
       msg.textContent = `${errorText(e)} The recording could not be saved.`;
     } finally {
       recBtn.disabled = false;
     }
   });
-  const form = h(
+
+  // -- typing (the old way, still there) --
+  const text = h('textarea', {
+    rows: '6',
+    value: draft.text,
+    placeholder: 'Or type it here (the keyboard mic works too).',
+  });
+  const save = h('button', { class: 'primary', type: 'submit' }, 'Save');
+  for (const el of [date, location, hours, text]) el.addEventListener('input', keep);
+  const typeForm = h(
     'form',
     {
       onsubmit: async (ev) => {
@@ -228,31 +291,22 @@ views.log = (root) => {
         const d = readForm();
         if (!d.text.trim()) return void (msg.textContent = 'Nothing to save yet.');
         save.disabled = true;
-        msg.textContent = 'Saving…';
         try {
-          const entry = {
-            tab: TABS.inbox,
-            rows: [{ id: d.id, session_date: d.date, location: d.location, hours: d.hours, text: d.text, method: 'keyboard' }],
-          };
-          let queued = false;
-          try {
-            await api.call('add', { tab: entry.tab, rows: entry.rows });
-          } catch (e) {
-            if (e.message !== 'offline') throw e;
-            state.queue = enqueue(state.queue, entry);
-            store.set('queue', state.queue);
-            queued = true;
-          }
+          const sent = await send([
+            { tab: TABS.inbox, rows: [{ id: d.id, session_date: d.date, location: d.location, hours: d.hours, text: d.text, method: 'keyboard' }] },
+          ], 'Saving');
           store.set('last', { location: d.location, hours: d.hours });
           draft.id = uid();
           text.value = '';
-          date.value = todayISO();
           keep();
-          msg.textContent = queued
-            ? 'No connection. Your note is queued on this phone and goes out when you are back online.'
-            : `Saved. Claude files it into your sheet at ${runAt()}. More to add? Just save again.`;
-          if (queued) update();
-          else refresh();
+          if (!sent) {
+            msg.textContent = 'No connection. Your note is queued on this phone and goes out when you are back online.';
+            update();
+          } else {
+            await refresh();
+            await fileNow(msg, { auto: true });
+            update();
+          }
         } catch (e) {
           msg.textContent = `${errorText(e)} Your note is still here, tap Save again.`;
         } finally {
@@ -260,23 +314,27 @@ views.log = (root) => {
         }
       },
     },
+    text,
+    save
+  );
+  const typeBox = h('details', { class: 'type', open: draft.text ? true : null }, h('summary', null, 'Type instead'), typeForm);
+
+  root.append(
+    h('h1', null, 'Log a session'),
     h('div', { class: 'row3' }, h('label', null, 'Date', date), h('label', null, 'Where', location), h('label', null, 'Hours', hours)),
     h('datalist', { id: 'locations' }, locations.map((l) => h('option', { value: l }))),
-    text,
-    save,
-    recBtn,
-    recPause,
-    recCancel,
-    msg
+    h('div', { class: 'recorder' }, recBtn, recTime, recRow, recHint),
+    msg,
+    typeBox,
+    list
   );
-  root.append(h('h1', null, 'Log a session'), form, list);
 
   // "How accurate was this?" so typed and recorded notes can be compared on Home.
   const rateRow = (r) =>
     h(
       'div',
       { class: 'rate' },
-      h('span', { class: 'meta' }, `${r.method === 'recording' ? 'Recorded' : 'Typed'}. Accuracy: `),
+      h('span', { class: 'meta' }, 'Accuracy: '),
       [1, 2, 3, 4, 5].map((n) =>
         h(
           'button',
@@ -299,40 +357,55 @@ views.log = (root) => {
       )
     );
 
+  const clipText = (r) => {
+    const pending = filingNow() ? 'Voice note: transcribing now…' : 'Voice note: transcribed at the next run, or tap File now.';
+    const p = h('p', { class: 'clip' }, r.text || (r.method === 'recording' ? pending : ''));
+    p.addEventListener('click', () => p.classList.toggle('full'));
+    return p;
+  };
+
+  // One card per training day, with its clips; that's one row in his sheet.
   const update = () => {
-    const items = newest(state.inbox, 'created_at').filter((r) => r.status !== 'cancelled').slice(0, 8);
     const queued = state.queue.filter((q) => q.tab === TABS.inbox).map((q) => q.rows[0]);
-    fill(list, queued.length ? h('h2', null, 'Queued on this phone') : '',
-      queued.map((r) =>
-        h(
+    const items = state.inbox.filter((r) => r.status !== 'cancelled');
+    const days = [...new Set(newest(items, 'created_at').map((r) => r.session_date))].slice(0, 6);
+    fill(list,
+      queued.length ? h('h2', null, 'Waiting for signal') : '',
+      queued.map((r) => h('div', { class: 'card' }, h('div', { class: 'meta' }, `${isoToSheetDate(r.session_date) || r.session_date} · on this phone`), clipText(r))),
+      days.length ? h('h2', null, 'Recent sessions') : '',
+      days.map((day) => {
+        const clips = items.filter((r) => r.session_date === day).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+        const head = clips[0];
+        const waiting = clips.filter((r) => r.status === 'new');
+        const rows = [...new Set(clips.map((r) => r.sheet_row).filter(Boolean))];
+        let status;
+        if (clips.every((r) => r.status === 'test')) status = h('span', { class: 'chip' }, 'Test only');
+        else if (waiting.length) {
+          status = filingNow()
+            ? h('span', { class: 'chip wait' }, 'Filing now…')
+            : h('span', null, h('span', { class: 'chip wait' }, `Waiting for ${runAt()}`), ' ', h('button', { class: 'link', type: 'button', onclick: () => fileNow(msg) }, 'File now'));
+        } else status = h('span', { class: 'chip ok' }, rows.length ? `In your sheet, row ${rows.join(', ')}` : 'Done');
+        return h(
           'div',
           { class: 'card' },
-          h('div', { class: 'meta' }, `${isoToSheetDate(r.session_date) || r.session_date} · ${r.location || 'no gym'} · ${r.hours || '?'} h`),
-          h('p', { class: 'clip' }, r.text),
-          h('div', { class: 'meta' }, 'Queued. Sends when you are back online.')
-        )
-      ),
-      items.length ? h('h2', null, 'Recently saved') : '',
-      items.map((r) =>
-        h(
-          'div',
-          { class: 'card' },
-          h('div', { class: 'meta' }, `${isoToSheetDate(r.session_date) || r.session_date} · ${r.location || 'no gym'} · ${r.hours || '?'} h`),
-          h('p', { class: 'clip' }, r.text || (r.method === 'recording' ? 'Voice note, transcribed at the next run.' : '')),
-          r.status === 'new'
-            ? h(
-                'div',
-                { class: 'meta' },
-                `Waiting for the ${runAt()} run. `,
-                h('button', { class: 'link', onclick: () => cancel(TABS.inbox, r.id) }, 'Cancel')
-              )
-            : h('div', { class: 'meta ok' }, r.sheet_row ? `Filed in your sheet, row ${r.sheet_row}.` : `Status: ${r.status}.`),
-          r.agent_note ? h('p', { class: 'note' }, r.agent_note) : '',
-          r.status !== 'new' ? rateRow(r) : ''
-        )
-      )
+          h('div', { class: 'dayhead' }, h('strong', null, isoToSheetDate(day) || day), h('span', { class: 'meta' }, ` · ${head.location || 'no gym'} · ${head.hours || '?'} h`)),
+          status,
+          clips.map((r) =>
+            h(
+              'div',
+              { class: 'cliprow' },
+              h('span', { class: 'meta' }, r.method === 'recording' ? 'Voice' : 'Typed'),
+              clipText(r),
+              r.agent_note && r.status !== 'processed' ? h('p', { class: 'note' }, r.agent_note) : '',
+              r.status === 'new' ? h('button', { class: 'link', type: 'button', onclick: () => cancel(TABS.inbox, r.id) }, 'Remove this clip') : '',
+              r.status === 'processed' ? rateRow(r) : ''
+            )
+          )
+        );
+      })
     );
   };
+  if (filingNow()) startPolling();
   return update;
 };
 

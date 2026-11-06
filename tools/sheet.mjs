@@ -9,7 +9,12 @@
 //   node tools/sheet.mjs get "App · Inbox" [--status new]
 //   node tools/sheet.mjs inbox | questions | feedback    shortcuts for status=new
 //   node tools/sheet.mjs settings
-//   node tools/sheet.mjs append-session session.json   {"date":"YYYY-MM-DD","location","hours","cells":[...]}
+//   node tools/sheet.mjs file-session session.json     {"date":"YYYY-MM-DD","location","hours","cells":[...]}
+//       fills that date's row if it exists (empty cells only, tips after his), else adds a row in
+//       date order. A failed save leaves nothing behind. (append-session is the old name.)
+//   node tools/sheet.mjs fill-cells <row> <col> values.json   write into EMPTY cells of one row
+//   node tools/sheet.mjs prune-row <row> <shown date>   delete a row holding nothing but that date
+//   node tools/sheet.mjs inspect <row>                  shown values, formats, validation rules
 //   node tools/sheet.mjs add "App · Log" rows.json      JSON array of row objects
 //   node tools/sheet.mjs update "App · Inbox" <id> fields.json
 //   node tools/sheet.mjs audio <inbox_id> <out-file>    joins a recording's slices into a file
@@ -92,7 +97,14 @@ function main(argv) {
     case 'settings':
       return print(call('settings'));
     case 'append-session':
-      return print(call('appendSession', readJson(rest[0])));
+    case 'file-session':
+      return print(call('fileSession', readJson(rest[0])));
+    case 'fill-cells':
+      return print(call('fillCells', { row: Number(rest[0]), col: Number(rest[1]), values: readJson(rest[2]) }));
+    case 'prune-row':
+      return print(call('pruneRow', { row: Number(rest[0]), expect: rest[1] }));
+    case 'inspect':
+      return print(call('inspect', { row: Number(rest[0]) }));
     case 'add':
       return print(call('add', { tab: rest[0], rows: readJson(rest[1]) }));
     case 'update':

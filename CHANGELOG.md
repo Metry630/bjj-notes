@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.0 (2026-11-06)
+
+- Log screen rebuilt around recording: a big Record button, a timer, Pause/Continue, and Stop that
+  saves and starts filing straight away (outside 09:00-18:00; then a File now button). Typing moved
+  under "Type instead". Each training day is one card with its clips and the sheet row it landed in.
+- Sheet script v3 (needs one redeploy): a save can no longer leave a junk row (it rolls back), a
+  dropdown on Location no longer rejects a new gym, a day's clips go into that day's row (including
+  a row he started himself), new dates go in date order, and old date-only rows can be pruned.
+- Bottom bar fits five tabs.
+
 ## 0.4.5 (2026-11-06)
 
 - Recording: Pause and Continue buttons (the timer skips paused time), the screen stays awake while recording, and Cancel recording needs a second tap so a slip does not lose a long recording.

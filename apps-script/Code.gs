@@ -10,7 +10,9 @@
  * Version: New version > Deploy. The URL stays the same.
  *
  * Enforced here rather than by convention:
- * - Sheet1 is append-only: appendSession (agent token) adds a row; no action edits or deletes one.
+ * - Sheet1: no action changes or deletes a cell that has something in it. fileSession (agent
+ *   token) fills the empty cells of that date's row or adds a row in date order; pruneRow deletes
+ *   only a row holding nothing but a date (what a failed save used to leave behind).
  * - Only "App · *" tabs are read or written, never "App · Setup" (it shows the tokens).
  * - Phone token: read, add to Inbox/Questions/Feedback/Audio, edit or cancel its own items while
  *   they are still "new", rate a filed note, answer an open decision, set the routine mode, and
@@ -88,9 +90,19 @@ function handle_(role, req) {
       return withLock_(function () { return add_(role, appTab_(req.tab), req.rows); });
     case 'update':
       return withLock_(function () { return update_(role, appTab_(req.tab), req.id, req.fields); });
-    case 'appendSession':
+    case 'appendSession': // older name, same thing
+    case 'fileSession':
       if (role !== 'agent') throw new Error('forbidden');
-      return withLock_(function () { return appendSession_(req); });
+      return withLock_(function () { return fileSession_(req); });
+    case 'fillCells':
+      if (role !== 'agent') throw new Error('forbidden');
+      return withLock_(function () { return fillCells_(req); });
+    case 'pruneRow':
+      if (role !== 'agent') throw new Error('forbidden');
+      return withLock_(function () { return pruneRow_(req); });
+    case 'inspect':
+      if (role !== 'agent') throw new Error('forbidden');
+      return inspect_(req);
     case 'runNow':
       if (role !== 'phone') throw new Error('forbidden'); // the routine never starts itself
       return withLock_(runNow_);
@@ -147,49 +159,222 @@ function layout_(values) {
   };
 }
 
-function appendSession_(req) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(req.date || ''));
+// ---- Sheet1 writes ----
+//
+// Every write goes through fillRow_, which refuses a cell that isn't empty, widens a dropdown rule
+// that would reject the value (his Location column has one, and a new gym broke every save from
+// 3 Nov), flushes inside the call so a rejection is caught here, and clears what it wrote if
+// anything fails. So a failed save leaves nothing behind.
+
+// One session: fill that date's row (his own, or an earlier save) or add a row in date order.
+function fileSession_(req) {
+  const date = isoDate_(req.date);
+  const cells = (Array.isArray(req.cells) ? req.cells : [])
+    .map(function (c) { return String(c == null ? '' : c).trim(); })
+    .filter(function (c) { return c; });
+  if (!cells.length) throw new Error('no_cells');
+  if (cells.length > 30) throw new Error('too_many_cells');
+  const hours = hours_(req.hours);
+  const location = String(req.location == null ? '' : req.location).trim();
+  const sh = ss_().getSheetByName(NOTES_SHEET);
+  const rows = sessionRows_(sh);
+
+  const same = rows.filter(function (r) { return r.key === date.key; });
+  const target = same.filter(function (r) { return r.filled; }).pop() || same.pop();
+  if (target) {
+    const writes = [];
+    if (location && !String(target.cells[1]).trim()) writes.push([2, location]);
+    if (hours !== '' && !String(target.cells[2]).trim()) writes.push([3, hours]);
+    const from = Math.max(4, target.lastCol + 1);
+    cells.forEach(function (c, i) { writes.push([from + i, c]); });
+    fillRow_(sh, target.row, writes);
+    return { row: target.row, merged: true };
+  }
+
+  // New row after the latest earlier session, so the sheet stays in date order.
+  let prev = null;
+  rows.forEach(function (r) { if (r.key && r.key < date.key && (!prev || r.key >= prev.key)) prev = r; });
+  const lastRow = sh.getLastRow();
+  const lastSession = rows.length ? rows[rows.length - 1].row : lastRow;
+  const model = prev ? prev.row : lastSession;
+  let r = lastRow + 1;
+  let inserted = false;
+  if (prev && prev.row < lastSession) {
+    sh.insertRowAfter(prev.row);
+    r = prev.row + 1;
+    inserted = true;
+  }
+  const width = Math.max(3 + cells.length, sh.getLastColumn());
+  ensureCols_(sh, width);
+  sh.getRange(model, 1, 1, width).copyTo(sh.getRange(r, 1, 1, width), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+  const writes = [[1, dateValue_(sh, model, date)], [2, location], [3, hours]];
+  cells.forEach(function (c, i) { writes.push([4 + i, c]); });
+  try {
+    fillRow_(sh, r, writes);
+  } catch (err) {
+    if (inserted) sh.deleteRow(r); // the row this call added, empty again after the rollback
+    throw err;
+  }
+  return { row: r, merged: false, inserted: inserted };
+}
+
+// Low-level: write values into empty cells of one row, left to right from `col`. Column 1 takes
+// a YYYY-MM-DD date. For fixes a future run needs without a redeploy.
+function fillCells_(req) {
+  const sh = ss_().getSheetByName(NOTES_SHEET);
+  const r = Number(req.row);
+  const col = Number(req.col);
+  const first = layout_(sh.getDataRange().getDisplayValues()).first;
+  if (!(Math.floor(r) === r && r >= first && r <= sh.getLastRow() + 1)) throw new Error('bad_row');
+  if (!(Math.floor(col) === col && col >= 1 && col <= 60)) throw new Error('bad_col');
+  const values = Array.isArray(req.values) ? req.values : [];
+  if (!values.length || values.length > 30) throw new Error('bad_values');
+  const model = r > first ? r - 1 : r;
+  const writes = values.map(function (v, i) {
+    return [col + i, col + i === 1 ? dateValue_(sh, model, isoDate_(v)) : v];
+  });
+  return { row: r, written: fillRow_(sh, r, writes) };
+}
+
+// Deletes a row only if it holds nothing but a date and still shows `expect` in column A.
+function pruneRow_(req) {
+  const sh = ss_().getSheetByName(NOTES_SHEET);
+  const r = Number(req.row);
+  const first = layout_(sh.getDataRange().getDisplayValues()).first;
+  if (!(Math.floor(r) === r && r >= first && r <= sh.getLastRow())) throw new Error('bad_row');
+  const range = sh.getRange(r, 1, 1, Math.max(1, sh.getLastColumn()));
+  const shown = range.getDisplayValues()[0];
+  const formulas = range.getFormulas()[0];
+  if (shown.slice(1).some(function (c) { return String(c).trim() !== ''; })) throw new Error('not_date_only');
+  if (formulas.some(function (f) { return f; })) throw new Error('has_formula');
+  if (String(shown[0]).trim() !== String(req.expect == null ? '' : req.expect).trim()) throw new Error('changed');
+  sh.deleteRow(r);
+  return { deleted: r };
+}
+
+// Read-only look at one row: what's shown, formats and validation rules. For diagnosing.
+function inspect_(req) {
+  const sh = ss_().getSheetByName(NOTES_SHEET);
+  const r = Number(req.row);
+  if (!(Math.floor(r) === r && r >= 1 && r <= sh.getMaxRows())) throw new Error('bad_row');
+  const width = Math.max(4, sh.getLastColumn());
+  const range = sh.getRange(r, 1, 1, width);
+  const rules = range.getDataValidations()[0];
+  return {
+    row: r,
+    shown: range.getDisplayValues()[0],
+    formats: range.getNumberFormats()[0],
+    rules: rules.map(function (rule, i) {
+      if (!rule) return null;
+      return { col: i + 1, type: String(rule.getCriteriaType()), values: rule.getCriteriaValues(), allow_invalid: rule.getAllowInvalid() };
+    }).filter(function (x) { return x; }),
+  };
+}
+
+function fillRow_(sh, row, writes) {
+  writes = writes.filter(function (w) { return w[1] !== '' && w[1] != null; });
+  if (!writes.length) return 0;
+  ensureCols_(sh, Math.max.apply(null, writes.map(function (w) { return w[0]; })));
+  writes.forEach(function (w) {
+    const v = sh.getRange(row, w[0]).getValue();
+    if (v !== '' && v != null) throw new Error('not_empty: row ' + row + ', column ' + w[0]);
+  });
+  try {
+    writes.forEach(function (w) {
+      const cell = sh.getRange(row, w[0]);
+      relaxRule_(cell, w[1]);
+      if (typeof w[1] === 'string') cell.setNumberFormat('@');
+      cell.setValue(typeof w[1] === 'string' ? clean_(w[1]) : w[1]);
+    });
+    SpreadsheetApp.flush();
+  } catch (err) {
+    writes.forEach(function (w) {
+      try { sh.getRange(row, w[0]).clearContent(); } catch (e) { /* best effort */ }
+    });
+    try { SpreadsheetApp.flush(); } catch (e) { /* best effort */ }
+    throw new Error('write_failed: ' + msg_(err));
+  }
+  return writes.length;
+}
+
+// A rule on the cell must not reject the value: a dropdown list gets the value added (it stays a
+// clean dropdown), any other rule warns instead of rejecting.
+function relaxRule_(cell, value) {
+  const rule = cell.getDataValidation();
+  if (!rule) return;
+  try {
+    if (rule.getCriteriaType() === SpreadsheetApp.DataValidationCriteria.VALUE_IN_LIST) {
+      const cv = rule.getCriteriaValues();
+      const list = (cv[0] || []).map(String);
+      if (list.indexOf(String(value)) >= 0) return;
+      cell.setDataValidation(
+        SpreadsheetApp.newDataValidation()
+          .requireValueInList(list.concat([String(value)]), cv[1] !== false)
+          .setAllowInvalid(rule.getAllowInvalid())
+          .build()
+      );
+    } else if (!rule.getAllowInvalid()) {
+      cell.setDataValidation(rule.copy().setAllowInvalid(true).build());
+    }
+  } catch (err) {
+    cell.clearDataValidations();
+  }
+}
+
+// His sessions: row number, date key (yyyymmdd), whether anything besides the date is there.
+function sessionRows_(sh) {
+  const values = sh.getDataRange().getDisplayValues();
+  const first = layout_(values).first;
+  const out = [];
+  for (let i = first - 1; i < values.length; i++) {
+    const cells = values[i];
+    let lastCol = 0;
+    for (let j = cells.length - 1; j >= 0; j--) {
+      if (String(cells[j]).trim() !== '') { lastCol = j + 1; break; }
+    }
+    if (!lastCol) continue;
+    out.push({
+      row: i + 1,
+      key: dateKey_(cells[0]),
+      filled: cells.slice(1).some(function (c) { return String(c).trim() !== ''; }),
+      lastCol: lastCol,
+      cells: cells,
+    });
+  }
+  return out;
+}
+
+// "3/11/26", "03/11/26", "3/11/2026" -> 20261103; anything else -> 0.
+function dateKey_(shown) {
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/.exec(String(shown).trim());
+  if (!m) return 0;
+  const y = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
+  return y * 10000 + Number(m[2]) * 100 + Number(m[1]);
+}
+
+function isoDate_(s) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ''));
   if (!m) throw new Error('bad_date');
   const y = Number(m[1]);
   const mo = Number(m[2]);
   const d = Number(m[3]);
   const check = new Date(Date.UTC(y, mo - 1, d));
   if (check.getUTCFullYear() !== y || check.getUTCMonth() !== mo - 1 || check.getUTCDate() !== d) throw new Error('bad_date');
-  const cells = (Array.isArray(req.cells) ? req.cells : [])
-    .map(function (c) { return String(c == null ? '' : c).trim(); })
-    .filter(function (c) { return c; });
-  if (!cells.length) throw new Error('no_cells');
-  if (cells.length > 30) throw new Error('too_many_cells');
-  const hours = req.hours === '' || req.hours == null ? '' : Number(req.hours);
-  if (hours !== '' && !(hours >= 0 && hours <= 12)) throw new Error('bad_hours');
+  return { y: y, mo: mo, d: d, key: y * 10000 + mo * 100 + d };
+}
 
-  const sh = ss_().getSheetByName(NOTES_SHEET);
-  const last = sh.getLastRow();
-  const r = last + 1;
-  const width = Math.max(3 + cells.length, sh.getLastColumn());
-  ensureCols_(sh, width);
-  // Same look as the previous session row (wrap, fonts, date format).
-  sh.getRange(last, 1, 1, width).copyTo(sh.getRange(r, 1, 1, width), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+function hours_(h) {
+  if (h === '' || h == null) return '';
+  const n = Number(h);
+  if (!(n >= 0 && n <= 12)) throw new Error('bad_hours');
+  return n;
+}
 
-  // A dropdown rule on a column (e.g. a gym list) must not reject a new value half way through a row.
-  sh.getRange(r, 1, 1, width).clearDataValidations();
-  const dateCell = sh.getRange(r, 1);
-  if (isDate_(sh.getRange(last, 1).getValue())) {
-    // A day serial in the copied date format: no script-vs-sheet time zone shift.
-    dateCell.setValue((Date.UTC(y, mo - 1, d) - Date.UTC(1899, 11, 30)) / 86400000);
-  } else {
-    // Previous dates are text like 1/11/24: write the same, as text, so the locale can't flip d/m.
-    dateCell.setNumberFormat('@');
-    dateCell.setValue(d + '/' + mo + '/' + String(y).slice(-2));
-  }
-  const loc = sh.getRange(r, 2);
-  loc.setNumberFormat('@');
-  loc.setValue(clean_(req.location || ''));
-  sh.getRange(r, 3).setValue(hours);
-  const tips = sh.getRange(r, 4, 1, cells.length);
-  tips.setNumberFormat('@');
-  tips.setValues([cells.map(clean_)]);
-  return { row: r };
+// The date the way the neighbouring row stores it: a day serial (shown in that row's date format,
+// no time zone shift) if it holds a real date, else text like 3/11/26 so the locale can't flip d/m.
+function dateValue_(sh, model, date) {
+  if (isDate_(sh.getRange(model, 1).getValue())) return (Date.UTC(date.y, date.mo - 1, date.d) - Date.UTC(1899, 11, 30)) / 86400000;
+  return date.d + '/' + date.mo + '/' + String(date.y).slice(-2);
 }
 
 // ---- App tabs ----

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadCodeGs, sampleSheet1 } from './fake-gas.mjs';
+import { loadCodeGs, sampleSheet1, listRule } from './fake-gas.mjs';
 
 function ready(opts) {
   const env = loadCodeGs(opts);
@@ -114,26 +114,18 @@ test('appendSession appends one row and leaves every existing row untouched (tex
   const { post, agent, sheet1 } = ready();
   const before = snapshot(sheet1, 6);
   const res = post({ action: 'appendSession', date: '2026-10-31', location: 'Gym B', hours: 1.5, cells: ['=not a formula', ' second tip ', ''], token: agent });
-  assert.deepEqual(res, { ok: true, row: 7 });
+  assert.deepEqual(res, { ok: true, row: 7, merged: false, inserted: false });
   assert.equal(snapshot(sheet1, 6), before);
   assert.deepEqual(sheet1.getRange(7, 1, 1, 6).getValues()[0], ['31/10/26', 'Gym B', 1.5, "'=not a formula", 'second tip', '']);
   assert.equal(sheet1.peek(7, 1).fmt, '@');
   assert.equal(sheet1.peek(7, 4).fmt, '@');
 });
 
-test('appendSession still writes the whole row when the new row has a data-validation rule', () => {
-  const { post, agent, sheet1 } = ready();
-  for (let c = 1; c <= 6; c++) sheet1.cell(7, c).dv = true;
-  const res = post({ action: 'appendSession', date: '2026-10-31', location: 'New Gym', hours: 1, cells: ['a'], token: agent });
-  assert.deepEqual(res, { ok: true, row: 7 });
-  assert.deepEqual(sheet1.getRange(7, 1, 1, 4).getValues()[0], ['31/10/26', 'New Gym', 1, 'a']);
-});
-
 test('appendSession writes a day serial in the copied date format when dates are real dates', () => {
   const { post, agent, sheet1 } = ready({ sheet1: sampleSheet1({ dates: 'date' }) });
   sheet1.cell(6, 1).fmt = 'd/m/yy';
-  post({ action: 'appendSession', date: '2024-10-27', location: 'Gym B', hours: 1, cells: ['x'], token: agent });
-  assert.equal(sheet1.getRange(7, 1).getValue(), 45592); // 27 Oct 2024 as a Sheets serial
+  post({ action: 'appendSession', date: '2024-11-05', location: 'Gym B', hours: 1, cells: ['x'], token: agent });
+  assert.equal(sheet1.getRange(7, 1).getValue(), 45601); // 5 Nov 2024 as a Sheets serial
   assert.equal(sheet1.peek(7, 1).fmt, 'd/m/yy');
 });
 
@@ -254,4 +246,111 @@ test('run now reports Anthropic errors and does not count them', () => {
   env.props.set('RUN_TOKEN', 'sk-ant-oat01-test');
   assert.equal(env.post({ action: 'runNow', token: env.phone }).error, 'fire_failed_429');
   assert.equal(env.props.get('RUN_COUNT'), undefined);
+});
+
+
+// ---- v3: saving to Sheet1 never leaves junk and never touches a filled cell ----
+
+// His real sheet from 3 Nov: a dropdown on Location (copied onto new rows), his own 3/11/26 row
+// with only date and hours, then later rows he typed himself.
+function realisticSheet() {
+  const sh = sampleSheet1();
+  for (const r of [5, 6]) sh.cell(r, 2).rule = listRule(['Gym A', 'Gym B']);
+  sh.cell(7, 1).v = '3/11/26';
+  sh.cell(7, 3).v = 1;
+  sh.cell(7, 2).rule = listRule(['Gym A', 'Gym B']);
+  sh.cell(8, 1).v = '4/11/26';
+  sh.cell(8, 3).v = 1;
+  sh.cell(8, 4).v = 'his own tip';
+  return sh;
+}
+const rowsOf = (sheet, from, to, width = 7) =>
+  Array.from({ length: to - from + 1 }, (_, i) => sheet.getRange(from + i, 1, 1, width).getValues()[0]);
+
+test('the old failure reproduced: a value the dropdown rejects used to leave a date-only row', () => {
+  const env = ready({ sheet1: realisticSheet() });
+  const { sheet1 } = env;
+  // What v2 did: copy formats (and the dropdown) to a new row, write cell by cell, flush at the end.
+  sheet1.getRange(6, 1, 1, 6).copyTo(sheet1.getRange(9, 1, 1, 6), 'PASTE_FORMAT');
+  sheet1.getRange(9, 1).setValue('5/11/26');
+  sheet1.getRange(9, 2).setValue('GB SG');
+  sheet1.getRange(9, 4).setValue('a tip');
+  assert.throws(() => sheet1.flush(), /violates the data validation rules/);
+  assert.deepEqual(sheet1.getRange(9, 1, 1, 4).getValues()[0], ['5/11/26', '', '', '']);
+});
+
+test('fileSession fills his own row for that date: empty cells only, after his tips', () => {
+  const { post, agent, sheet1 } = ready({ sheet1: realisticSheet() });
+  const before = rowsOf(sheet1, 5, 8);
+  const res = post({ action: 'fileSession', date: '2026-11-03', location: 'GB SG', hours: 1, cells: ['armbar to omoplata', 'curl the hamstring'], token: agent });
+  assert.deepEqual(res, { ok: true, row: 7, merged: true });
+  assert.deepEqual(sheet1.getRange(7, 1, 1, 6).getValues()[0], ['3/11/26', 'GB SG', 1, 'armbar to omoplata', 'curl the hamstring', '']);
+  assert.deepEqual(sheet1.getRange(7, 2).getDataValidation().getCriteriaValues()[0], ['Gym A', 'Gym B', 'GB SG']);
+  assert.equal(sheet1.getLastRow(), 8, 'no new row');
+  assert.deepEqual(rowsOf(sheet1, 8, 8), before.slice(3));
+  // A second clip for the same day lands after the first one's tips.
+  post({ action: 'fileSession', date: '2026-11-03', location: 'GB SG', hours: 1, cells: ['third tip'], token: agent });
+  assert.equal(sheet1.getRange(7, 6).getValue(), 'third tip');
+  assert.equal(sheet1.getRange(7, 3).getValue(), 1, 'hours never doubled');
+});
+
+test('fileSession adds a new date in date order, past a dropdown that does not know the gym', () => {
+  const { post, agent, sheet1 } = ready({ sheet1: realisticSheet() });
+  const res = post({ action: 'fileSession', date: '2026-11-06', location: 'GB SG', hours: 1.5, cells: ['new tip'], token: agent });
+  assert.deepEqual(res, { ok: true, row: 9, merged: false, inserted: false });
+  assert.deepEqual(sheet1.getRange(9, 1, 1, 4).getValues()[0], ['6/11/26', 'GB SG', 1.5, 'new tip']);
+  // An earlier date goes between his rows; the rows after it move down untouched.
+  const later = rowsOf(sheet1, 7, 9);
+  const mid = post({ action: 'fileSession', date: '2026-11-02', location: 'GB SG', hours: 1, cells: ['mid tip'], token: agent });
+  assert.deepEqual(mid, { ok: true, row: 7, merged: false, inserted: true });
+  assert.deepEqual(sheet1.getRange(7, 1, 1, 4).getValues()[0], ['2/11/26', 'GB SG', 1, 'mid tip']);
+  assert.deepEqual(rowsOf(sheet1, 8, 10), later);
+});
+
+test('a failed write is rolled back: no junk row, no inserted row, a JSON error', () => {
+  const env = ready({ sheet1: realisticSheet() });
+  const { post, agent, sheet1, flushHooks } = env;
+  const before = rowsOf(sheet1, 1, 9);
+  flushHooks.failNext = true;
+  const res = post({ action: 'fileSession', date: '2026-11-06', location: 'GB SG', hours: 1, cells: ['x'], token: agent });
+  assert.equal(res.ok, false);
+  assert.match(res.error, /^write_failed: Service error/);
+  assert.deepEqual(rowsOf(sheet1, 1, 9), before);
+  flushHooks.failNext = true;
+  assert.match(post({ action: 'fileSession', date: '2026-11-02', cells: ['x'], token: agent }).error, /^write_failed/);
+  assert.deepEqual(rowsOf(sheet1, 1, 9), before, 'the inserted row is gone again');
+  assert.equal(sheet1.getLastRow(), 8);
+});
+
+test('fillCells writes only into empty cells of one row', () => {
+  const { post, agent, sheet1 } = ready({ sheet1: realisticSheet() });
+  assert.match(post({ action: 'fillCells', row: 8, col: 4, values: ['over his tip'], token: agent }).error, /^not_empty/);
+  assert.equal(sheet1.getRange(8, 4).getValue(), 'his own tip');
+  assert.deepEqual(post({ action: 'fillCells', row: 8, col: 2, values: ['GB SG'], token: agent }), { ok: true, row: 8, written: 1 });
+  assert.equal(post({ action: 'fillCells', row: 3, col: 5, values: ['x'], token: agent }).error, 'bad_row');
+  assert.deepEqual(post({ action: 'fillCells', row: 9, col: 1, values: ['2026-11-07', 'GB SG', 1, 'tip'], token: agent }).written, 4);
+  assert.deepEqual(sheet1.getRange(9, 1, 1, 4).getValues()[0], ['7/11/26', 'GB SG', 1, 'tip']);
+});
+
+test('pruneRow removes only a row that holds nothing but the expected date', () => {
+  const { post, agent, phone, sheet1 } = ready({ sheet1: realisticSheet() });
+  sheet1.cell(9, 1).v = '3/11/26';
+  sheet1.cell(10, 1).v = '3/11/26';
+  assert.equal(post({ action: 'pruneRow', row: 7, expect: '3/11/26', token: agent }).error, 'not_date_only');
+  assert.equal(post({ action: 'pruneRow', row: 9, expect: '4/11/26', token: agent }).error, 'changed');
+  assert.equal(post({ action: 'pruneRow', row: 4, expect: 'Total:', token: agent }).error, 'bad_row');
+  assert.equal(post({ action: 'pruneRow', row: 9, expect: '3/11/26', token: phone }).error, 'forbidden');
+  assert.deepEqual(post({ action: 'pruneRow', row: 10, expect: '3/11/26', token: agent }), { ok: true, deleted: 10 });
+  assert.deepEqual(post({ action: 'pruneRow', row: 9, expect: '3/11/26', token: agent }), { ok: true, deleted: 9 });
+  assert.equal(sheet1.getLastRow(), 8);
+  assert.equal(sheet1.getRange(7, 3).getValue(), 1, 'his 3/11/26 row with hours stays');
+});
+
+test('inspect shows formats and rules; phone cannot use any Sheet1 write', () => {
+  const { post, agent, phone } = ready({ sheet1: realisticSheet() });
+  const info = post({ action: 'inspect', row: 7, token: agent });
+  assert.deepEqual(info.rules, [{ col: 2, type: 'VALUE_IN_LIST', values: [['Gym A', 'Gym B'], true], allow_invalid: false }]);
+  for (const action of ['fileSession', 'fillCells', 'inspect']) {
+    assert.equal(post({ action, row: 7, col: 4, values: ['x'], date: '2026-11-03', cells: ['x'], token: phone }).error, 'forbidden', action);
+  }
 });
