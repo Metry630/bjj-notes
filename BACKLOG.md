@@ -7,7 +7,7 @@ His requests (from `App · Feedback`) always go above your own items.
 
 - [x] **Fix Stop and save on the record screen** (he asked, 4 Nov). Shipped 0.4.3. Likely cause:
       the phone ends the recording (lock, call) and stop never finished. Part 2 is the usability item.
-- [ ] **Voice recording usability** (he asked, 4 Nov). Recording is clumsy to use, he would rather
+- [x] **Voice recording usability** (he asked, 4 Nov). Shipped 0.4.5 (pause, screen stays awake, cancel confirm). Recording is clumsy to use, he would rather
       type in the sheet. Reading chosen: review the whole record flow (start, pause, stop, save,
       feedback on screen, errors) and remove friction, keeping the old way working.
 - [x] **Date picker defaults to today** (he asked, 3 Nov). Shipped 0.4.2.

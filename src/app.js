@@ -6,7 +6,7 @@ import { enqueue, flush } from './queue.js';
 import { startRecording, blobToBase64, audioBatches } from './recorder.js';
 import { todayISO, draftDate, isoToSheetDate, nextRunLabel, hoursSince, shortTime } from './dates.js';
 
-export const VERSION = '0.4.4';
+export const VERSION = '0.4.5';
 
 const TABS = {
   inbox: 'App · Inbox',
@@ -123,6 +123,8 @@ views.log = (root) => {
   let timer = 0;
   const recBtn = h('button', { class: 'secondary rec', type: 'button' }, 'Record instead');
   const recCancel = h('button', { class: 'link', type: 'button', hidden: true }, 'Cancel recording');
+  const recPause = h('button', { class: 'secondary', type: 'button', hidden: true }, 'Pause');
+  let cancelArmed = 0;
   const clock = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
   const resetRec = () => {
     clearInterval(timer);
@@ -130,8 +132,30 @@ views.log = (root) => {
     recBtn.textContent = 'Record instead';
     recBtn.classList.remove('on');
     recCancel.hidden = true;
+    recCancel.textContent = 'Cancel recording';
+    cancelArmed = 0;
+    recPause.hidden = true;
+    recPause.textContent = 'Pause';
   };
+  recPause.addEventListener('click', () => {
+    if (!recording) return;
+    if (recording.paused) {
+      if (recording.resume()) {
+        recPause.textContent = 'Pause';
+        msg.textContent = 'Recording again.';
+      }
+    } else if (recording.pause()) {
+      recPause.textContent = 'Continue';
+      msg.textContent = 'Paused. Tap Continue to keep going, or Stop and save.';
+    }
+  });
   recCancel.addEventListener('click', () => {
+    // Two taps, so a slip does not throw away a long recording.
+    if (!cancelArmed) {
+      cancelArmed = 1;
+      recCancel.textContent = 'Tap again to discard';
+      return;
+    }
     recording?.cancel();
     resetRec();
     msg.textContent = 'Recording discarded.';
@@ -146,7 +170,8 @@ views.log = (root) => {
       }
       recBtn.classList.add('on');
       recCancel.hidden = false;
-      const tick = () => (recBtn.textContent = `Stop and save (${clock(Math.round((Date.now() - recording.started) / 1000))})`);
+      recPause.hidden = false;
+      const tick = () => (recBtn.textContent = `Stop and save (${clock(recording.elapsed())})`);
       tick();
       timer = setInterval(tick, 1000);
       msg.textContent = 'Recording. Talk through the session, then tap Stop and save.';
@@ -240,6 +265,7 @@ views.log = (root) => {
     text,
     save,
     recBtn,
+    recPause,
     recCancel,
     msg
   );

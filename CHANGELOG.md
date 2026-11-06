@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.5 (2026-11-06)
+
+- Recording: Pause and Continue buttons (the timer skips paused time), the screen stays awake while recording, and Cancel recording needs a second tap so a slip does not lose a long recording.
+
 ## 0.4.4 (2026-11-05)
 
 - Sheet script fix: adding a session to Sheet1 no longer stops half way when the new row has a dropdown rule. Needs the updated script pasted into Apps Script and redeployed.

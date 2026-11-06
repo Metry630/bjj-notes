@@ -44,9 +44,52 @@ export async function startRecording() {
   };
   rec.start(1000);
   const started = Date.now();
-  const release = () => stream.getTracks().forEach((t) => t.stop());
+  // Time spent recording, not counting pauses.
+  let pausedAt = 0;
+  let pausedMs = 0;
+  const elapsed = () => Math.max(0, Math.round(((pausedAt || Date.now()) - started - pausedMs) / 1000));
+  // Keep the screen on while recording: a locked phone is the usual reason the mic gets cut.
+  let lock = null;
+  try {
+    navigator.wakeLock?.request?.('screen').then((l) => (lock = l), () => {});
+  } catch {
+    // not supported
+  }
+  const release = () => {
+    stream.getTracks().forEach((t) => t.stop());
+    try {
+      lock?.release?.();
+    } catch {
+      // already released
+    }
+  };
   return {
     started,
+    elapsed,
+    get paused() {
+      return !!pausedAt;
+    },
+    pause: () => {
+      if (pausedAt || rec.state !== 'recording') return false;
+      try {
+        rec.pause();
+      } catch {
+        return false;
+      }
+      pausedAt = Date.now();
+      return true;
+    },
+    resume: () => {
+      if (!pausedAt) return false;
+      try {
+        rec.resume();
+      } catch {
+        return false;
+      }
+      pausedMs += Date.now() - pausedAt;
+      pausedAt = 0;
+      return true;
+    },
     // Resolves once with what was recorded, even if the phone already ended the recording (screen
     // lock, mic taken by a call) so rec.stop() throws or onstop never fires.
     stop: () =>
@@ -58,7 +101,7 @@ export async function startRecording() {
           release();
           const mime = rec.mimeType || wanted || 'audio/mp4';
           if (!chunks.length) return reject(new Error('empty'));
-          resolve({ blob: new Blob(chunks, { type: mime }), mime, seconds: Math.round((Date.now() - started) / 1000) });
+          resolve({ blob: new Blob(chunks, { type: mime }), mime, seconds: elapsed() });
         };
         if (rec.state === 'inactive') return finish();
         rec.onstop = finish;

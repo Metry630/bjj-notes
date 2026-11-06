@@ -10,6 +10,12 @@ function install({ stopThrows = false, noStopEvent = false, state = 'recording',
     start() {
       if (data) setTimeout(() => this.ondataavailable?.({ data: new Blob(['abc']) }), 0);
     }
+    pause() {
+      this.state = 'paused';
+    }
+    resume() {
+      this.state = 'recording';
+    }
     stop() {
       if (stopThrows) throw new Error('InvalidStateError');
       this.state = 'inactive';
@@ -55,4 +61,21 @@ test('stop rejects when nothing was captured', async () => {
   const { startRecording } = await import('../src/recorder.js');
   const r = await startRecording();
   await assert.rejects(r.stop(), /empty/);
+});
+
+test('pause and resume toggle and elapsed time does not run while paused', async () => {
+  install();
+  const { startRecording } = await import('../src/recorder.js');
+  const r = await startRecording();
+  assert.equal(r.paused, false);
+  assert.equal(r.pause(), true);
+  assert.equal(r.paused, true);
+  assert.equal(r.pause(), false);
+  const frozen = r.elapsed();
+  await new Promise((res) => setTimeout(res, 30));
+  assert.equal(r.elapsed(), frozen);
+  assert.equal(r.resume(), true);
+  assert.equal(r.paused, false);
+  assert.equal(r.resume(), false);
+  r.cancel();
 });
