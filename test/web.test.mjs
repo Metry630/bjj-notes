@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { search, toCells, expand, queryTerms, highlightTerms } from '../src/search.js';
+import { search, toCells, expand, queryTerms, highlightTerms, topicCells, topicCounts } from '../src/search.js';
 import { draftDate, todayISO, sheetDateToISO, isoToSheetDate, nextRunLabel, hoursSince } from '../src/dates.js';
 import { parseLink, makeApi } from '../src/api.js';
 import { findLeaks, shingles, addedLines } from '../tools/check-public.mjs';
@@ -213,4 +213,16 @@ test('draftDate keeps the date only for an unsent draft', () => {
   assert.equal(draftDate({ date: '2026-10-31', text: 'x' }, now), '2026-10-31');
   assert.equal(draftDate({ date: '2026-10-31', text: '' }, now), '2026-11-03');
   assert.equal(draftDate(null, now), '2026-11-03');
+});
+
+test('topic browser: counts tips by topic and aliases, most first', () => {
+  const topics = [
+    { topic: 'Closed guard', aliases: 'full guard' },
+    { topic: 'De la riva', aliases: '' },
+    { topic: 'Zebra', aliases: '' },
+  ];
+  const counts = topicCounts(topics, cells);
+  assert.deepEqual(counts.map((c) => c.topic), ['De la riva', 'Closed guard', 'Zebra']);
+  assert.deepEqual(counts.map((c) => c.count), [2, 1, 0]);
+  assert.equal(topicCells(cells, topics[0])[0].text, 'closed guard posture');
 });

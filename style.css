@@ -149,3 +149,6 @@ details.type summary { color: var(--accent); font-weight: 600; margin: 8px 0; cu
 .dayhead { margin-bottom: 6px; }
 .cliprow { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 8px; }
 .clip.full { -webkit-line-clamp: unset; display: block; }
+.chips { margin: 8px 0; }
+.chip { display: inline-block; margin: 0 10px 8px 0; padding: 6px 10px; border: 1px solid var(--accent); border-radius: 16px; text-decoration: none; }
+.chip.on { background: var(--accent); color: #fff; }

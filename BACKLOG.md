@@ -28,7 +28,7 @@ His requests (from `App · Feedback`) always go above your own items.
 - [x] **Clean up test items** (he asked, 2 Nov). Done 6 Nov: test notes and test runs hidden.
       Sheet1 had four date-only 3/11/26 rows from the old save bug; removed with `prune-row`
       once the 0.5.0 script is live.
-- [ ] **Topic browser** (he asked, 1 Nov). A Topics list in the app, most tips first; tapping one
+- [x] **Topic browser** (he asked, 1 Nov). Shipped 0.6.0 as topic chips on Search. A Topics list in the app, most tips first; tapping one
       shows the summary and the matching tips with dates. Add a topic filter on Search.
 - [ ] **Topic index, part 2d.** Cover the remaining topics. From then on, each run refreshes only
       the topics that newly filed notes touch.

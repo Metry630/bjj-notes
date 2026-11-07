@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0 (2026-11-08)
+
+- Search: topic chips (most tips first) filter the tips by topic, with the topic summary on top.
+
 ## 0.5.1 (2026-11-07)
 
 - Analysis: fun facts card (longest streak, busiest month, longest session, most drilled topic, totals).

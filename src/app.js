@@ -1,12 +1,12 @@
 import { store } from './store.js';
 import { makeApi, parseLink } from './api.js';
-import { search, toCells, highlightTerms, norm } from './search.js';
+import { search, toCells, highlightTerms, norm, topicCells, topicCounts } from './search.js';
 import { byGym, funFacts } from './analysis.js';
 import { enqueue, flush } from './queue.js';
 import { startRecording, blobToBase64, audioBatches } from './recorder.js';
 import { todayISO, draftDate, isoToSheetDate, nextRunLabel, hoursSince, shortTime } from './dates.js';
 
-export const VERSION = '0.5.1';
+export const VERSION = '0.6.0';
 
 const TABS = {
   inbox: 'App · Inbox',
@@ -52,6 +52,7 @@ const state = {
   syncedAt: store.get('syncedAt', ''),
   status: '',
   askPrefill: '',
+  topic: '',
 };
 
 // ---- DOM helper: text nodes only, never innerHTML with data ----
@@ -416,11 +417,46 @@ views.search = (root) => {
     state.query = input.value;
     draw();
   });
-  root.append(h('h1', null, 'Search your notes'), input, out);
+  const chips = h('div', { class: 'chips' });
+  root.append(h('h1', null, 'Search your notes'), input, chips, out);
+
+  function drawChips(cells) {
+    const counts = topicCounts(state.topics, cells).filter((c) => c.count > 0);
+    if (!counts.length) return fill(chips);
+    fill(chips,
+      h('div', { class: 'meta' }, state.topic ? 'Topic filter (tap again to clear)' : 'Topics, most tips first'),
+      counts.map((c) =>
+        h('button', {
+          class: state.topic === c.topic ? 'link chip on' : 'link chip',
+          type: 'button',
+          onclick: () => {
+            state.topic = state.topic === c.topic ? '' : c.topic;
+            draw();
+          },
+        }, `${c.topic} (${c.count})`)
+      )
+    );
+  }
 
   function draw() {
     const q = input.value.trim();
     const cells = toCells(state.notes);
+    drawChips(cells);
+    const picked = state.topic ? state.topics.find((t) => t.topic === state.topic) : null;
+    if (picked) {
+      let tips = topicCells(cells, picked);
+      if (q) {
+        const keep = new Set(search(tips, q).map((c) => `${c.row}:${c.col}`));
+        tips = tips.filter((c) => keep.has(`${c.row}:${c.col}`));
+      }
+      tips = tips.slice().sort((a, b) => b.row - a.row || a.col - b.col);
+      fill(out,
+        h('div', { class: 'card topic' }, h('div', { class: 'meta' }, 'Topic summary'), h('h3', null, picked.topic), h('p', { class: 'pre' }, picked.summary)),
+        h('div', { class: 'meta' }, `${tips.length} tips, newest first`),
+        tips.map((c) => h('div', { class: 'card' }, h('div', { class: 'meta' }, `${c.date} · ${c.location}`), h('p', null, q ? highlighted(c.text, q) : c.text)))
+      );
+      return;
+    }
     if (!q) {
       const recent = (state.notes?.rows ?? []).slice(-5).reverse();
       fill(out, h('h2', null, 'Recent sessions'),

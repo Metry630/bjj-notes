@@ -104,3 +104,31 @@ export function highlightTerms(q) {
   for (const p of expand(q)) for (const t of p.split(' ')) if (t.length > 1) out.add(t);
   return [...out].sort((a, b) => b.length - a.length);
 }
+
+// Topic browser: a topic row has `topic` and comma-separated `aliases`.
+export function topicNames(t) {
+  return [t.topic, ...String(t.aliases ?? '').split(',')].map(norm).filter(Boolean);
+}
+
+// Tips that mention the topic or any of its aliases (whole words/phrases, accents ignored).
+export function topicCells(cells, t) {
+  const names = expandNames(topicNames(t));
+  return cells.filter((c) => {
+    const hay = norm(c.text);
+    return names.some((n) => has(hay, n));
+  });
+}
+
+function expandNames(names) {
+  const out = new Set(names);
+  for (const n of names) for (const e of expand(n)) out.add(e);
+  return [...out];
+}
+
+// [{ topic, count }] most tips first, topics with no tips last.
+export function topicCounts(topics, cells) {
+  return topics
+    .filter((t) => t.topic && t.hidden !== 'yes')
+    .map((t) => ({ topic: t.topic, count: topicCells(cells, t).length }))
+    .sort((a, b) => b.count - a.count || a.topic.localeCompare(b.topic));
+}
