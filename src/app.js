@@ -1,12 +1,12 @@
 import { store } from './store.js';
 import { makeApi, parseLink } from './api.js';
 import { search, toCells, highlightTerms, norm } from './search.js';
-import { byGym } from './analysis.js';
+import { byGym, funFacts } from './analysis.js';
 import { enqueue, flush } from './queue.js';
 import { startRecording, blobToBase64, audioBatches } from './recorder.js';
 import { todayISO, draftDate, isoToSheetDate, nextRunLabel, hoursSince, shortTime } from './dates.js';
 
-export const VERSION = '0.5.0';
+export const VERSION = '0.5.1';
 
 const TABS = {
   inbox: 'App · Inbox',
@@ -729,6 +729,10 @@ views.analysis = (root) => {
     if (!gyms.length) return fill(out, h('p', { class: 'meta' }, 'No notes loaded yet.'));
     fill(out,
       h('p', { class: 'meta' }, 'Hours and most covered topics per gym. Sessions since 1 October count as GB SG here; your sheet is unchanged.'),
+      h('div', { class: 'card' },
+        h('strong', null, 'Fun facts'),
+        funFacts(state.notes).map((f) => h('p', null, `${f.label}: ${f.value}`))
+      ),
       gyms.map((g) =>
         h('div', { class: 'card' },
           h('strong', null, g.name),

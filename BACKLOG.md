@@ -20,7 +20,7 @@ His requests (from `App · Feedback`) always go above your own items.
       puts them into that day's single row with the hours counted once.
 - [x] **Stats: topics, not filler words** (he asked, 3 Nov). Shipped 0.4.1: curated list of guards,
       positions and techniques counted per gym.
-- [ ] **Analysis page, part 2: fun facts only** (part 1 shipped in 0.4.0)
+- [x] **Analysis page, part 2: fun facts only** (part 1 shipped in 0.4.0; part 2 shipped 0.5.1)
       Original request: (he asked, 2 Nov). New screen: hours per gym, most common keywords per gym,
       fun facts (longest streak, busiest month, most drilled topic, etc.). Reading chosen: every
       session since 1 October of the latest year counts as the gym he named for that period, as a

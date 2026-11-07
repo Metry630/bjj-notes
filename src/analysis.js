@@ -73,3 +73,33 @@ export function byGym(notes) {
     .map(({ tips, ...g }) => ({ ...g, tipCount: tips.length, topics: topics(tips) }))
     .sort((a, b) => b.hours - a.hours);
 }
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const dayNum = (iso) => Math.round(Date.parse(`${iso}T00:00:00Z`) / 86400e3);
+
+// Fun facts over all sessions. Returns [{label, value}], skipping facts there is no data for.
+export function funFacts(notes) {
+  const rows = (notes?.rows ?? [])
+    .map((r) => ({ iso: sheetDateToISO(r.cells[0]), hours: parseFloat(r.cells[2]) || 0, tips: r.cells.slice(3).map(String).filter((t) => t.trim()) }))
+    .filter((r) => r.iso);
+  if (!rows.length) return [];
+  const facts = [];
+  const days = [...new Set(rows.map((r) => dayNum(r.iso)))].sort((a, b) => a - b);
+  let best = 1, run = 1;
+  for (let i = 1; i < days.length; i++) {
+    run = days[i] === days[i - 1] + 1 ? run + 1 : 1;
+    if (run > best) best = run;
+  }
+  facts.push({ label: 'Longest streak', value: `${best} ${best === 1 ? 'day' : 'days'} in a row` });
+  const months = new Map();
+  for (const r of rows) months.set(r.iso.slice(0, 7), (months.get(r.iso.slice(0, 7)) || 0) + r.hours);
+  const [mKey, mHours] = [...months].sort((a, b) => b[1] - a[1] || b[0].localeCompare(a[0]))[0];
+  if (mHours > 0) facts.push({ label: 'Busiest month', value: `${MONTHS[Number(mKey.slice(5)) - 1]} ${mKey.slice(0, 4)}, ${mHours} hours` });
+  const long = rows.reduce((a, r) => (r.hours > a.hours ? r : a), rows[0]);
+  if (long.hours > 0) facts.push({ label: 'Longest session', value: `${long.hours} hours on ${long.iso.slice(8)}/${long.iso.slice(5, 7)}/${long.iso.slice(2, 4)}` });
+  const top = topics(rows.flatMap((r) => r.tips), 1)[0];
+  if (top) facts.push({ label: 'Most drilled topic', value: `${top.word} (${top.count} tips)` });
+  const total = rows.reduce((s, r) => s + r.hours, 0);
+  facts.push({ label: 'Total', value: `${total} hours over ${rows.length} sessions` });
+  return facts;
+}

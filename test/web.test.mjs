@@ -157,7 +157,7 @@ test('the routine joins slices back into the original bytes, and refuses a parti
   assert.throws(() => assembleAudio(split, 'other'), /no audio/);
 });
 
-import { gymOf, latestYear, topics, byGym } from '../src/analysis.js';
+import { gymOf, latestYear, topics, byGym, funFacts } from '../src/analysis.js';
 
 test('analysis: sessions since 1 October of the latest year count as the current gym', () => {
   const rows = [
@@ -188,6 +188,24 @@ test('analysis: topics count once per tip, merge spellings, ignore filler words'
     { word: 'de la riva', count: 2 },
     { word: 'sweep', count: 1 },
   ]);
+});
+
+test('analysis: fun facts', () => {
+  const f = funFacts({
+    rows: [
+      { row: 1, cells: ['30/9/25', 'A', '1', 'sweep'] },
+      { row: 2, cells: ['1/10/25', 'A', '2', 'sweep', 'armbar'] },
+      { row: 3, cells: ['2/10/25', 'A', '1.5', 'sweep'] },
+      { row: 4, cells: ['9/10/25', 'A', '1', 'x'] },
+    ],
+  });
+  const v = Object.fromEntries(f.map((x) => [x.label, x.value]));
+  assert.equal(v['Longest streak'], '3 days in a row');
+  assert.equal(v['Busiest month'], 'Oct 2025, 4.5 hours');
+  assert.equal(v['Longest session'], '2 hours on 01/10/25');
+  assert.equal(v['Most drilled topic'], 'sweep (3 tips)');
+  assert.equal(v.Total, '5.5 hours over 4 sessions');
+  assert.deepEqual(funFacts({ rows: [] }), []);
 });
 
 test('draftDate keeps the date only for an unsent draft', () => {

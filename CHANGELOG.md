@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.1 (2026-11-07)
+
+- Analysis: fun facts card (longest streak, busiest month, longest session, most drilled topic, totals).
+
 ## 0.5.0 (2026-11-06)
 
 - Log screen rebuilt around recording: a big Record button, a timer, Pause/Continue, and Stop that
