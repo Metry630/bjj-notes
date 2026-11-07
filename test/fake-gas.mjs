@@ -128,6 +128,7 @@ class FakeRange {
   getDataValidations() { return this.grid((x) => x.rule); }
   getDataValidation() { return this.sheet.peek(this.r, this.c).rule; }
   setDataValidation(rule) { this.each((r, c) => { this.sheet.cell(r, c).rule = rule; }); return this; }
+  setDataValidations(rules) { this.each((r, c, i, j) => { this.sheet.cell(r, c).rule = rules[i][j]; }); return this; }
   clearDataValidations() { this.each((r, c) => { this.sheet.cell(r, c).rule = null; }); return this; }
   getValue() { return this.sheet.peek(this.r, this.c).v; }
   getFormula() { return this.sheet.peek(this.r, this.c).f; }

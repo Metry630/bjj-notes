@@ -100,6 +100,9 @@ function handle_(role, req) {
     case 'pruneRow':
       if (role !== 'agent') throw new Error('forbidden');
       return withLock_(function () { return pruneRow_(req); });
+    case 'addListOption':
+      if (role !== 'agent') throw new Error('forbidden');
+      return withLock_(function () { return addListOption_(req); });
     case 'inspect':
       if (role !== 'agent') throw new Error('forbidden');
       return inspect_(req);
@@ -250,6 +253,29 @@ function pruneRow_(req) {
   if (String(shown[0]).trim() !== String(req.expect == null ? '' : req.expect).trim()) throw new Error('changed');
   sh.deleteRow(r);
   return { deleted: r };
+}
+
+// Adds a value to every dropdown list in one Sheet1 column (a new gym to Location), so it is there
+// when he types a row himself. Changes rules only, never a value.
+function addListOption_(req) {
+  const sh = ss_().getSheetByName(NOTES_SHEET);
+  const col = Number(req.col);
+  const value = String(req.value == null ? '' : req.value).trim();
+  if (!(Math.floor(col) === col && col >= 1 && col <= 60) || !value) throw new Error('bad_request');
+  const first = layout_(sh.getDataRange().getDisplayValues()).first;
+  const range = sh.getRange(first, col, sh.getMaxRows() - first + 1, 1);
+  let changed = 0;
+  const rules = range.getDataValidations().map(function (row) {
+    const rule = row[0];
+    if (!rule || rule.getCriteriaType() !== SpreadsheetApp.DataValidationCriteria.VALUE_IN_LIST) return [rule];
+    const cv = rule.getCriteriaValues();
+    const list = (cv[0] || []).map(String);
+    if (list.indexOf(value) >= 0) return [rule];
+    changed++;
+    return [SpreadsheetApp.newDataValidation().requireValueInList(list.concat([value]), cv[1] !== false).setAllowInvalid(rule.getAllowInvalid()).build()];
+  });
+  if (changed) range.setDataValidations(rules);
+  return { col: col, changed: changed };
 }
 
 // Read-only look at one row: what's shown, formats and validation rules. For diagnosing.

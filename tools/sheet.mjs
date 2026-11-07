@@ -15,6 +15,7 @@
 //   node tools/sheet.mjs fill-cells <row> <col> values.json   write into EMPTY cells of one row
 //   node tools/sheet.mjs prune-row <row> <shown date>   delete a row holding nothing but that date
 //   node tools/sheet.mjs inspect <row>                  shown values, formats, validation rules
+//   node tools/sheet.mjs add-option <col> <value>       add a value to a column's dropdown lists
 //   node tools/sheet.mjs add "App · Log" rows.json      JSON array of row objects
 //   node tools/sheet.mjs update "App · Inbox" <id> fields.json
 //   node tools/sheet.mjs audio <inbox_id> <out-file>    joins a recording's slices into a file
@@ -105,6 +106,8 @@ function main(argv) {
       return print(call('pruneRow', { row: Number(rest[0]), expect: rest[1] }));
     case 'inspect':
       return print(call('inspect', { row: Number(rest[0]) }));
+    case 'add-option':
+      return print(call('addListOption', { col: Number(rest[0]), value: rest[1] }));
     case 'add':
       return print(call('add', { tab: rest[0], rows: readJson(rest[1]) }));
     case 'update':

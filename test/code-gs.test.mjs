@@ -354,3 +354,16 @@ test('inspect shows formats and rules; phone cannot use any Sheet1 write', () =>
     assert.equal(post({ action, row: 7, col: 4, values: ['x'], date: '2026-11-03', cells: ['x'], token: phone }).error, 'forbidden', action);
   }
 });
+
+test('addListOption puts a new gym into the Location dropdown down the column, values untouched', () => {
+  const { post, agent, phone, sheet1 } = ready({ sheet1: realisticSheet() });
+  for (let r = 9; r <= 20; r++) sheet1.cell(r, 2).rule = listRule(['Gym A', 'Gym B']);
+  const before = rowsOf(sheet1, 5, 8);
+  const res = post({ action: 'addListOption', col: 2, value: 'GB SG', token: agent });
+  assert.equal(res.ok, true);
+  assert.equal(res.changed, 15); // rows 5-7 and 9-20 had the list
+  assert.deepEqual(sheet1.getRange(15, 2).getDataValidation().getCriteriaValues()[0], ['Gym A', 'Gym B', 'GB SG']);
+  assert.deepEqual(rowsOf(sheet1, 5, 8), before);
+  assert.equal(post({ action: 'addListOption', col: 2, value: 'GB SG', token: agent }).changed, 0, 'idempotent');
+  assert.equal(post({ action: 'addListOption', col: 2, value: 'x', token: phone }).error, 'forbidden');
+});
