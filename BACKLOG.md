@@ -11,10 +11,9 @@ His requests (from `App · Feedback`) always go above your own items.
       type in the sheet. Reading chosen: review the whole record flow (start, pause, stop, save,
       feedback on screen, errors) and remove friction, keeping the old way working.
 - [x] **Date picker defaults to today** (he asked, 3 Nov). Shipped 0.4.2.
-- [ ] **File the 3 Nov notes** (he asked, 3 Nov). Blocked until the 0.5.0 sheet script is
-      deployed. Then `file-session` puts the two recordings and the typed note into his own
-      3/11/26 row (he started it with 1 hour), as tips after nothing, location GB SG. Once filed,
-      check this off and say so in the log.
+- [x] **File the 3 Nov notes** (he asked, 3 Nov). Done 7 Nov after the v3 script went live: 14
+      tips in his own 3/11/26 row, GB SG filled for sessions since October and added to the Location
+      dropdown, the four date-only rows removed.
 - [x] **Multi-recording sessions** (he asked, 3 Nov). Shipped 0.5.0: record as many clips as you
       like (pause/continue inside a clip too); each day's clips show as one card and `file-session`
       puts them into that day's single row with the hours counted once.
