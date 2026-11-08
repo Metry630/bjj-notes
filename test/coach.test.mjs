@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { ladder, spike, vdot, predict, trainingPaces, parseDistance, parseTime, clock, planWeek } from '../tools/coach.mjs';
 import { assembleImages, coachContext, isoFromSheet } from '../tools/sheet.mjs';
 import { imageBatches, fitWithin } from '../src/images.js';
-import { weekOf, daysBetween, addDays, sessionDays, ladderState, paceText, profileMap, dayLabel, runTypes } from '../src/training.js';
+import { weekOf, daysBetween, addDays, sessionDays, ladderState, paceText, profileMap, dayLabel, runTypes, sessionPaces, paceSummary } from '../src/training.js';
+import { readFileSync } from 'node:fs';
 
 // Synthetic data only: this repo is public.
 
@@ -91,6 +92,18 @@ test('date helpers', () => {
   const types = runTypes([{ key: 'easy', name: 'Easy', pace: '8:00-8:30/km' }, { name: 'no key' }, null]);
   assert.deepEqual(Object.keys(types), ['easy']);
   assert.deepEqual(runTypes('not a list'), {});
+  const all = runTypes([
+    { key: 'easy', name: 'Gentle', pace: '9:10-9:40/km' },
+    { key: 'long', name: 'Far', pace: '9:20-9:50/km' },
+    { key: 'fast', name: 'Quick', pace: '5:00-5:10/km' },
+    { key: 'rest', name: 'Off', pace: '' },
+  ]);
+  const at = (what, t) => paceSummary(sessionPaces({ what, types: t }, all));
+  assert.equal(at('Easy 3 km', ['easy']), '9:10-9:40/km');
+  assert.equal(at('Long 7 km', ['long']), '9:20-9:50/km');
+  assert.equal(at('Quick: 2 easy then 2 fast', ['fast']), 'Quick 5:00-5:10/km · Easy km 9:10-9:40/km');
+  assert.equal(at('Rest', ['rest']), '');
+  assert.equal(at('Something new', []), '');
   assert.deepEqual(sessionDays(plan[0]).map((d) => [d.day, d.date, d.what]), [
     ['Fri', '2026-11-13', 'Easy 4 km'],
     ['Sat', '2026-11-14', '4×800 m'],
@@ -154,4 +167,10 @@ test('coach context: parsed profile, recent runs, BJJ load from the sheet', () =
   assert.deepEqual(ctx.bjj_last_14_days, [{ date: '2026-11-05', hours: '1.5' }]);
   assert.equal(isoFromSheet('3/11/26'), '2026-11-03');
   assert.equal(isoFromSheet('Total:'), '');
+});
+
+test('version.json matches the app version (the phone reloads when they differ)', () => {
+  const app = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
+  const version = /export const VERSION = '([^']+)'/.exec(app)[1];
+  assert.equal(JSON.parse(readFileSync(new URL('../version.json', import.meta.url), 'utf8')).version, version);
 });

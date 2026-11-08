@@ -172,3 +172,7 @@ details.type summary { color: var(--accent); font-weight: 600; margin: 8px 0; cu
 .check[hidden] { display: none; }
 .card.coachnote { border-left: 4px solid var(--ok); }
 .sess .meta { margin-top: 1px; }
+.pace { color: var(--accent); font-weight: 600; font-size: 0.95rem; }
+.pacerow { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--line); }
+.dayhead + .pacerow { border-top: 0; }
+.pacerow .meta { grid-column: 1 / -1; }

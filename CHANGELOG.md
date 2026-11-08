@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.2 (2026-11-09)
+
+- Run tab: a "Your paces" card at the top (easy, long, tempo, fast km, race pace), each session in
+  This week shows its paces in blue (both paces for mixed sessions, e.g. fast km and easy km), and
+  the full plan lists every day with its pace.
+- The app updates itself: when a new version is live it reloads once, and the offline cache checks
+  with the server instead of reusing a 10-minute-old copy.
+
 ## 0.7.1 (2026-11-09)
 
 - Run tab: every session in This week shows its pace and how it should feel, with "How to run

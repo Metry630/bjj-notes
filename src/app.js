@@ -5,10 +5,10 @@ import { byGym, funFacts } from './analysis.js';
 import { enqueue, flush } from './queue.js';
 import { startRecording, blobToBase64, audioBatches } from './recorder.js';
 import { shrink, imageBatches, MAX_IMAGES } from './images.js';
-import { weekOf, sessionDays, profileMap, ladderState, daysBetween, dayLabel, runTypes } from './training.js';
+import { weekOf, sessionDays, profileMap, ladderState, daysBetween, dayLabel, runTypes, sessionPaces, paceSummary } from './training.js';
 import { todayISO, draftDate, isoToSheetDate, nextRunLabel, hoursSince, shortTime } from './dates.js';
 
-export const VERSION = '0.7.1';
+export const VERSION = '0.7.2';
 
 const TABS = {
   inbox: 'App · Inbox',
@@ -770,6 +770,8 @@ views.run = (root) => {
     const days = week ? sessionDays(week) : [];
     // One entry per run type used this week, for "How to run these".
     const used = [...new Set(days.flatMap((s) => s.types))].filter((k) => types[k]?.how);
+    // The paces he runs at, always on screen: every type with a pace in numbers.
+    const paceTypes = Object.values(types).filter((t) => /\d:\d\d/.test(t.pace || '') && t.key !== 'raceday');
     fill(top,
       race
         ? h(
@@ -786,6 +788,14 @@ views.run = (root) => {
             ladder ? h('p', null, ladder) : ''
           )
         : h('div', { class: 'card' }, h('p', { class: 'meta' }, 'Your plan shows up here once the coach has set it up.')),
+      paceTypes.length
+        ? h(
+            'div',
+            { class: 'card' },
+            h('div', { class: 'dayhead' }, h('strong', null, 'Your paces')),
+            paceTypes.map((t) => h('div', { class: 'pacerow' }, h('span', null, t.name), h('span', { class: 'pace' }, t.pace), h('span', { class: 'meta' }, t.feel || '')))
+          )
+        : '',
       week
         ? h(
             'div',
@@ -798,8 +808,14 @@ views.run = (root) => {
               else if (s.date === today) chip = h('span', { class: 'chip wait' }, 'Today');
               else if (s.date < today && s.what && !/^rest/i.test(s.what)) chip = h('span', { class: 'chip' }, 'Not logged');
               const t = types[s.types[0]];
-              const pace = t ? [t.pace, t.feel].filter(Boolean).join(' · ') : '';
-              return h('div', { class: 'sess' }, h('span', { class: 'meta' }, s.day), h('div', null, s.what || 'Rest', pace ? h('div', { class: 'meta' }, pace) : ''), chip);
+              const pace = paceSummary(sessionPaces(s, types));
+              return h(
+                'div',
+                { class: 'sess' },
+                h('span', { class: 'meta' }, s.day),
+                h('div', null, s.what || 'Rest', pace ? h('div', { class: 'pace' }, pace) : '', t?.feel ? h('div', { class: 'meta' }, t.feel) : ''),
+                chip
+              );
             }),
             week.note ? h('p', { class: 'note pre' }, week.note) : '',
             used.length
@@ -879,7 +895,10 @@ views.run = (root) => {
                 'div',
                 { class: week && w.week === week.week ? 'planrow now' : 'planrow' },
                 h('div', null, h('strong', null, `W${w.week}`), ` ${dayLabel(w.start)} · ${w.block}`, w.status && w.status !== 'planned' ? [' ', h('span', { class: 'chip' }, w.status)] : ''),
-                h('div', { class: 'meta' }, `Fri ${w.fri || 'rest'} · Sat ${w.sat || 'rest'} · Sun ${w.sun || 'rest'}`)
+                sessionDays(w).map((s) => {
+                  const pace = paceSummary(sessionPaces(s, types));
+                  return h('div', { class: 'meta' }, `${s.day} ${s.what || 'Rest'}${pace ? ` · ${pace}` : ''}`);
+                })
               )
             )
           )
@@ -1242,13 +1261,32 @@ async function refresh() {
   }
 }
 
+// A home-screen app keeps running the code it was opened with. When version.json says a newer
+// version is live, reload once (at most every 15 minutes per version, so a stale CDN copy can't
+// cause a reload loop).
+async function checkVersion() {
+  try {
+    const res = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
+    const live = (await res.json()).version;
+    const last = store.get('reloadFor', {});
+    if (!live || live === VERSION || (last.v === live && Date.now() - last.at < 15 * 60000)) return;
+    store.set('reloadFor', { v: live, at: Date.now() });
+    location.reload();
+  } catch {
+    // offline: try next time
+  }
+}
+
 window.addEventListener('online', () => refresh());
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && hoursSince(state.syncedAt) > 0.03) refresh();
+  if (document.visibilityState !== 'visible') return;
+  checkVersion();
+  if (hoursSince(state.syncedAt) > 0.03) refresh();
 });
 
 show(state.view in views ? state.view : 'log');
 setStatus(state.syncedAt ? `Saved copy from ${shortTime(state.syncedAt)}.` : '');
 refresh();
+checkVersion();

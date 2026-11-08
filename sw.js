@@ -1,5 +1,6 @@
 // Keeps the app shell on the phone so it opens with no signal. Network first, so a new version
-// shows up as soon as there is a connection. Only same-origin GET requests are touched; calls to
+// shows up as soon as there is a connection: requests revalidate with the server ("no-cache")
+// rather than reusing GitHub Pages' 10-minute browser cache. Only same-origin GET requests are touched; calls to
 // the sheet API go straight through.
 const CACHE = 'bjj-notes-shell';
 const SHELL = ['./', 'index.html', 'style.css', 'manifest.webmanifest', 'icon.svg', 'icon-180.png',
@@ -18,7 +19,7 @@ self.addEventListener('fetch', (ev) => {
   const req = ev.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
   ev.respondWith(
-    fetch(req)
+    fetch(req, { cache: 'no-cache' })
       .then((res) => {
         if (res.ok) {
           const copy = res.clone();

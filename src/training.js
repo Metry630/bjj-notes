@@ -42,6 +42,23 @@ export function profileMap(rows) {
   return out;
 }
 
+// The paces to show for one session: its own type's, plus the easy pace when the session has easy
+// km in it ("1 easy + 3 tempo + 1 easy"). One pace alone is shown bare; several get names.
+export function sessionPaces(s, types) {
+  const out = [];
+  for (const k of s.types) if (types[k]?.pace) out.push({ name: types[k].name, pace: types[k].pace });
+  const easy = types.easy;
+  if (easy?.pace && /\beasy\b/i.test(s.what || '') && !s.types.some((k) => k === 'easy' || k === 'long')) {
+    out.push({ name: 'Easy km', pace: easy.pace });
+  }
+  return out;
+}
+
+export function paceSummary(list) {
+  if (list.length === 1) return list[0].pace;
+  return list.map((p) => `${p.name} ${p.pace}`).join(' · ');
+}
+
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 // "Long run step 3 of 13 done, next 7.3 km. 2 spare weeks left."

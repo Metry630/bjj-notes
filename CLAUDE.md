@@ -114,7 +114,8 @@ for something you could decide, and never answer a request with a question.
 2. `node --test test/*.test.mjs` green, with tests for what you changed.
 3. `node tools/check-public.mjs origin/main` must pass: it fails if the diff contains his note
    text, the token or the API URL. Fixtures are always synthetic.
-4. Bump `VERSION` in `src/app.js`, add a line to `CHANGELOG.md`, `git fetch` and rebase your
+4. Bump `VERSION` in `src/app.js` and in `version.json` (a test checks they match; the phone
+   reloads itself when they differ from what it runs), add a line to `CHANGELOG.md`, `git fetch` and rebase your
    branch on `origin/main` (someone else may have pushed), re-run the tests, fast-forward `main`,
    and `git push origin main` (never force-push).
 5. Confirm the deploy (the cloud proxy blocks the GitHub Pages API, so check the live file): poll
