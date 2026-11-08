@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1 (2026-11-08)
+
+- Topic index, part 2d: 4 more topics (35 in total).
+
 ## 0.6.0 (2026-11-08)
 
 - Search: topic chips (most tips first) filter the tips by topic, with the topic summary on top.

@@ -6,7 +6,7 @@ import { enqueue, flush } from './queue.js';
 import { startRecording, blobToBase64, audioBatches } from './recorder.js';
 import { todayISO, draftDate, isoToSheetDate, nextRunLabel, hoursSince, shortTime } from './dates.js';
 
-export const VERSION = '0.6.0';
+export const VERSION = '0.6.1';
 
 const TABS = {
   inbox: 'App · Inbox',

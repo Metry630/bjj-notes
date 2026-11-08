@@ -30,7 +30,7 @@ His requests (from `App · Feedback`) always go above your own items.
       once the 0.5.0 script is live.
 - [x] **Topic browser** (he asked, 1 Nov). Shipped 0.6.0 as topic chips on Search. A Topics list in the app, most tips first; tapping one
       shows the summary and the matching tips with dates. Add a topic filter on Search.
-- [ ] **Topic index, part 2d.** Cover the remaining topics. From then on, each run refreshes only
+- [x] **Topic index, part 2d.** Shipped 0.6.1: 4 more topics (35 in total). From then on, each run refreshes only
       the topics that newly filed notes touch.
 - [ ] **Search synonyms from his notes.** Grow `ALIASES` in `src/search.js` from the spellings he
       actually uses (e.g. halfguard / half guard, sidecontrol, backtake), with tests.
