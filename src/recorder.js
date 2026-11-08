@@ -123,3 +123,7 @@ export async function startRecording() {
     },
   };
 }
+
+// A recording saved with the Test switch on carries this as its text (the phone can only set text,
+// not status). The routine transcribes it, keeps the transcript in agent_note, and never files it.
+export const TEST_MARK = '[test voice note]';

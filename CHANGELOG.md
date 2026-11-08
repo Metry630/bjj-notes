@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.3 (2026-11-09)
+
+- Record screen: a Test switch. A recording saved with it on is transcribed but never filed in the sheet.
+
 ## 0.7.2 (2026-11-09)
 
 - Run tab: a "Your paces" card at the top (easy, long, tempo, fast km, race pace), each session in

@@ -79,3 +79,8 @@ test('pause and resume toggle and elapsed time does not run while paused', async
   assert.equal(r.resume(), false);
   r.cancel();
 });
+
+import { TEST_MARK } from '../src/recorder.js';
+test('test recordings carry a fixed marker the routine can recognise', () => {
+  assert.equal(TEST_MARK, '[test voice note]');
+});

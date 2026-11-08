@@ -3,12 +3,12 @@ import { makeApi, parseLink } from './api.js';
 import { search, toCells, highlightTerms, norm, topicCells, topicCounts } from './search.js';
 import { byGym, funFacts } from './analysis.js';
 import { enqueue, flush } from './queue.js';
-import { startRecording, blobToBase64, audioBatches } from './recorder.js';
+import { startRecording, blobToBase64, audioBatches, TEST_MARK } from './recorder.js';
 import { shrink, imageBatches, MAX_IMAGES } from './images.js';
 import { weekOf, sessionDays, profileMap, ladderState, daysBetween, dayLabel, runTypes, sessionPaces, paceSummary } from './training.js';
 import { todayISO, draftDate, isoToSheetDate, nextRunLabel, hoursSince, shortTime } from './dates.js';
 
-export const VERSION = '0.7.2';
+export const VERSION = '0.7.3';
 
 const TABS = {
   inbox: 'App · Inbox',
@@ -213,6 +213,8 @@ views.log = (root) => {
   const recPause = h('button', { class: 'secondary', type: 'button' }, 'Pause');
   const recCancel = h('button', { class: 'secondary', type: 'button' }, 'Cancel');
   const recRow = h('div', { class: 'recrow', hidden: true }, recPause, recCancel);
+  const testBox = h('input', { type: 'checkbox' });
+  const testRow = h('label', { class: 'testrow' }, testBox, ' Test (transcribe it, but do not file it in your sheet)');
   const recHint = h('p', { class: 'meta center' }, 'Tap and talk through the session. Pause any time. Stop saves it and files it into your sheet.');
 
   const idle = () => {
@@ -227,6 +229,7 @@ views.log = (root) => {
     recPause.textContent = 'Pause';
     recCancel.textContent = 'Cancel';
     recHint.hidden = false;
+    testRow.hidden = false;
   };
   recPause.addEventListener('click', () => {
     if (!recording) return;
@@ -263,6 +266,7 @@ views.log = (root) => {
       recTime.hidden = false;
       recRow.hidden = false;
       recHint.hidden = true;
+      testRow.hidden = true;
       msg.textContent = '';
       const tick = () => (recTime.textContent = clock(recording.elapsed()));
       tick();
@@ -279,14 +283,16 @@ views.log = (root) => {
       msg.textContent = 'No audio was captured (the phone stopped the mic). Tap Record to try again.';
       return;
     }
+    const isTest = testBox.checked;
     idle();
+    testBox.checked = false;
     recBtn.disabled = true;
     try {
       const d = readForm();
       const id = uid();
       const sent = await send(
         [
-          { tab: TABS.inbox, rows: [{ id, session_date: d.date, location: d.location, hours: d.hours, text: '', method: 'recording' }] },
+          { tab: TABS.inbox, rows: [{ id, session_date: d.date, location: d.location, hours: d.hours, text: isTest ? TEST_MARK : '', method: 'recording' }] },
           ...audioBatches(id, rec.mime, await blobToBase64(rec.blob)).map((rows) => ({ tab: TABS.audio, rows })),
         ],
         `Saving ${clock(rec.seconds)} of audio`
@@ -355,7 +361,7 @@ views.log = (root) => {
     h('h1', null, 'Log a session'),
     h('div', { class: 'row3' }, h('label', null, 'Date', date), h('label', null, 'Where', location), h('label', null, 'Hours', hours)),
     h('datalist', { id: 'locations' }, locations.map((l) => h('option', { value: l }))),
-    h('div', { class: 'recorder' }, recBtn, recTime, recRow, recHint),
+    h('div', { class: 'recorder' }, recBtn, recTime, recRow, testRow, recHint),
     msg,
     typeBox,
     list
@@ -391,7 +397,8 @@ views.log = (root) => {
 
   const clipText = (r) => {
     const pending = filingNow() ? 'Voice note: transcribing now…' : 'Voice note: transcribed at the next run, or tap File now.';
-    const p = h('p', { class: 'clip' }, r.text || (r.method === 'recording' ? pending : ''));
+    const test = r.method === 'recording' && r.text === TEST_MARK;
+    const p = h('p', { class: 'clip' }, test ? 'Test voice note: never filed in your sheet.' : r.text || (r.method === 'recording' ? pending : ''));
     p.addEventListener('click', () => p.classList.toggle('full'));
     return p;
   };

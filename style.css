@@ -138,6 +138,8 @@ details summary { color: var(--muted); font-size: 0.9rem; margin: 12px 0 4px; cu
 .rectime { font-size: 2.2rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .rectime.paused { opacity: 0.45; }
 .recrow { display: flex; gap: 10px; }
+.testrow { font-size: 0.9rem; color: var(--muted, inherit); }
+.testrow[hidden] { display: none; }
 .recrow[hidden], .rectime[hidden] { display: none; }
 .recrow .secondary { margin-top: 0; width: auto; min-width: 128px; }
 .center { text-align: center; max-width: 30em; }

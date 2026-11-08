@@ -5,7 +5,7 @@ His requests (from `App · Feedback`) always go above your own items.
 
 ## Up next
 
-- [ ] **Test mode for recordings** (he asked, 8 Nov). Reading chosen: a "Test" switch on the record
+- [x] **Test mode for recordings** (he asked, 8 Nov). Shipped 0.7.3. Reading chosen: a "Test" switch on the record
       screen; a recording saved with it on is marked as a test and never filed to Sheet1. Cancel
       while uploading already exists, so keep it and make it easy to find.
 - [x] **Fix Stop and save on the record screen** (he asked, 4 Nov). Shipped 0.4.3. Likely cause:

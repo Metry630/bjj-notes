@@ -45,7 +45,7 @@ for something you could decide, and never answer a request with a question.
 4. **Open the log row** before anything else, so a run cut off by the usage limit still leaves a
    trace: `add "App · Log"` with `{id: <run id>, started_at: <ISO UTC>, mode, summary: "Started."}`.
    Update it at the end (`finished_at`, `summary`, `shipped`, `needs_you`).
-5. **Recordings first.** Inbox items with `method: "recording"` and empty `text` are voice notes.
+5. **Recordings first.** Inbox items with `method: "recording"` and empty `text` are voice notes (see the test marker below).
    - `node tools/sheet.mjs audio <id> /tmp/<id>.audio`. If it says `incomplete`, the phone is
      still uploading: leave the item for the next run (after 24 h, set `agent_note` to say the
      upload never finished and mark it `failed`).
@@ -54,6 +54,7 @@ for something you could decide, and never answer a request with a question.
      `/tmp/whisper/bin/python tools/transcribe.py /tmp/<id>.audio --prompt "<terms>"`, where `<terms>` is ~40 BJJ
      terms and spellings that appear most in his notes (positions, techniques, his slang like kalo,
      gw, lu). The model (large-v3-turbo) downloads from huggingface.co on first use.
+   - A recording whose `text` is exactly `[test voice note]` was saved with the app's Test switch: transcribe it, put the transcript in `agent_note`, mark it `test`, never file it (leave `text` as is).
    - `update` the item's `text` with the raw transcript (that's the record of what he said), then
      `node tools/sheet.mjs audio-done <id>` to clear the audio. Then file it like any other note.
    - If transcription fails or takes over 10 minutes, retry with `--model small` and say so in the
