@@ -32,6 +32,9 @@ replying to anything.
 6. Reply on his message: `update "App · Coach" <id> {status: "answered", reply, replied_at}`. Every
    message gets a reply, including ones you couldn't process (say why).
 7. A cancelled message: clear its screenshots with `images-done` and leave it.
+8. A message whose text starts with "test" (any case) checks the plumbing. Read its screenshots and
+   reply with what you would have logged and decided, but write nothing to App · Runs, App · Plan or
+   the profile. Mark it `status: "test"` and clear its screenshots.
 
 **The weekly close.** In the first scheduled run on a Monday:
 - Mark last week's row with `status` (done | partial | missed) and a short `result`, from App · Runs.
