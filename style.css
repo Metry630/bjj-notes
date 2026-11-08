@@ -171,3 +171,4 @@ details.type summary { color: var(--accent); font-weight: 600; margin: 8px 0; cu
 .check { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; width: 100%; }
 .check[hidden] { display: none; }
 .card.coachnote { border-left: 4px solid var(--ok); }
+.sess .meta { margin-top: 1px; }

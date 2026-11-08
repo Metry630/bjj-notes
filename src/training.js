@@ -11,13 +11,21 @@ export function weekOf(plan, iso) {
   return plan.find((w) => w.start && w.start <= iso && iso < addDays(w.start, 7)) || null;
 }
 
-// The week's three runs with their dates: Fri, Sat, Sun.
+// The week's three runs with their dates and run types (fri_type etc., keys of the profile's
+// run_types; several joined by commas, e.g. "easy,strides").
 export function sessionDays(week) {
-  return [
-    { day: 'Fri', date: addDays(week.start, 4), what: week.fri },
-    { day: 'Sat', date: addDays(week.start, 5), what: week.sat },
-    { day: 'Sun', date: addDays(week.start, 6), what: week.sun },
-  ];
+  return ['fri', 'sat', 'sun'].map((d, i) => ({
+    day: ['Fri', 'Sat', 'Sun'][i],
+    date: addDays(week.start, 4 + i),
+    what: week[d],
+    types: String(week[`${d}_type`] || '').split(',').map((t) => t.trim()).filter(Boolean),
+  }));
+}
+
+// profile.run_types, [{ key, name, pace, feel, how }], keyed by `key`. The paces live only here,
+// so recalibrating them after a time trial updates every session in the app at once.
+export function runTypes(list) {
+  return Object.fromEntries((Array.isArray(list) ? list : []).filter((t) => t && t.key).map((t) => [t.key, t]));
 }
 
 // App · Profile rows -> { id: value }, JSON values parsed (race, ladder), hidden rows dropped.

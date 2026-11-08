@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { ladder, spike, vdot, predict, trainingPaces, parseDistance, parseTime, clock, planWeek } from '../tools/coach.mjs';
 import { assembleImages, coachContext, isoFromSheet } from '../tools/sheet.mjs';
 import { imageBatches, fitWithin } from '../src/images.js';
-import { weekOf, daysBetween, addDays, sessionDays, ladderState, paceText, profileMap, dayLabel } from '../src/training.js';
+import { weekOf, daysBetween, addDays, sessionDays, ladderState, paceText, profileMap, dayLabel, runTypes } from '../src/training.js';
 
 // Synthetic data only: this repo is public.
 
@@ -86,6 +86,11 @@ test('date helpers', () => {
   assert.equal(dayLabel('2027-03-21'), 'Sun 21 Mar');
   assert.equal(dayLabel(''), '');
   assert.equal(dayLabel('2026-10'), 'Oct 2026');
+  const typed = sessionDays({ ...plan[0], fri_type: 'easy', sat_type: 'easy, strides' });
+  assert.deepEqual(typed.map((d) => d.types), [['easy'], ['easy', 'strides'], []]);
+  const types = runTypes([{ key: 'easy', name: 'Easy', pace: '8:00-8:30/km' }, { name: 'no key' }, null]);
+  assert.deepEqual(Object.keys(types), ['easy']);
+  assert.deepEqual(runTypes('not a list'), {});
   assert.deepEqual(sessionDays(plan[0]).map((d) => [d.day, d.date, d.what]), [
     ['Fri', '2026-11-13', 'Easy 4 km'],
     ['Sat', '2026-11-14', '4×800 m'],

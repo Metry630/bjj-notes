@@ -5,10 +5,10 @@ import { byGym, funFacts } from './analysis.js';
 import { enqueue, flush } from './queue.js';
 import { startRecording, blobToBase64, audioBatches } from './recorder.js';
 import { shrink, imageBatches, MAX_IMAGES } from './images.js';
-import { weekOf, sessionDays, profileMap, ladderState, daysBetween, dayLabel } from './training.js';
+import { weekOf, sessionDays, profileMap, ladderState, daysBetween, dayLabel, runTypes } from './training.js';
 import { todayISO, draftDate, isoToSheetDate, nextRunLabel, hoursSince, shortTime } from './dates.js';
 
-export const VERSION = '0.7.0';
+export const VERSION = '0.7.1';
 
 const TABS = {
   inbox: 'App · Inbox',
@@ -766,6 +766,10 @@ views.run = (root) => {
     const race = profile.race && typeof profile.race === 'object' ? profile.race : null;
     const week = weekOf(state.plan, today);
     const ladder = ladderState(profile.ladder);
+    const types = runTypes(profile.run_types);
+    const days = week ? sessionDays(week) : [];
+    // One entry per run type used this week, for "How to run these".
+    const used = [...new Set(days.flatMap((s) => s.types))].filter((k) => types[k]?.how);
     fill(top,
       race
         ? h(
@@ -787,15 +791,20 @@ views.run = (root) => {
             'div',
             { class: 'card' },
             h('div', { class: 'dayhead' }, h('strong', null, `This week · W${week.week} ${week.block}`)),
-            sessionDays(week).map((s) => {
+            days.map((s) => {
               const done = state.runs.filter((r) => r.date === s.date);
               let chip = '';
               if (done.length) chip = h('span', { class: 'chip ok' }, done.map((r) => `${r.distance_km} km`).join(', '));
               else if (s.date === today) chip = h('span', { class: 'chip wait' }, 'Today');
               else if (s.date < today && s.what && !/^rest/i.test(s.what)) chip = h('span', { class: 'chip' }, 'Not logged');
-              return h('div', { class: 'sess' }, h('span', { class: 'meta' }, s.day), h('span', null, s.what || 'Rest'), chip);
+              const t = types[s.types[0]];
+              const pace = t ? [t.pace, t.feel].filter(Boolean).join(' · ') : '';
+              return h('div', { class: 'sess' }, h('span', { class: 'meta' }, s.day), h('div', null, s.what || 'Rest', pace ? h('div', { class: 'meta' }, pace) : ''), chip);
             }),
-            week.note ? h('p', { class: 'note pre' }, week.note) : ''
+            week.note ? h('p', { class: 'note pre' }, week.note) : '',
+            used.length
+              ? h('details', null, h('summary', null, 'How to run these'), used.map((k) => h('p', null, h('strong', null, `${types[k].name}: `), types[k].how)))
+              : ''
           )
         : ''
     );
@@ -850,6 +859,16 @@ views.run = (root) => {
           [r.session, r.verdict].some(Boolean) ? h('div', { class: 'meta' }, [r.session, r.verdict].filter(Boolean).join(' · ')) : ''
         )
       ),
+      Object.keys(types).length
+        ? h(
+            'details',
+            null,
+            h('summary', null, 'Run types and paces'),
+            Object.values(types).map((t) =>
+              h('div', { class: 'planrow' }, h('strong', null, t.name), t.pace ? ` · ${t.pace}` : '', t.feel ? h('div', { class: 'meta' }, t.feel) : '', t.how ? h('p', null, t.how) : '')
+            )
+          )
+        : '',
       plan.length
         ? h(
             'details',

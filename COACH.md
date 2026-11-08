@@ -66,6 +66,18 @@ came back, means repeating the week.
 - With no run at all in the last 30 days, restart from the longest recent run, not from where the
   ladder was.
 
+**Sessions are written in whole km**, so Strava's automatic km splits show every part. A phone
+can't split an 800 m rep or a timed jog, so don't prescribe those.
+- Fast km: pairs of one easy km then one fast km, repeated as written, then a 5-minute walk.
+  The even-numbered splits are the fast ones.
+- Tempo and race pace: 1 km easy, the block in one go, then 1-2 km easy.
+- Time trial: 1 km easy, then the trial distance.
+
+Each plan day has a type in `fri_type`, `sat_type` and `sun_type`. These are keys of the profile's
+`run_types` (easy, long, tempo, fast, race, strides, tt, rest, raceday), with several joined by
+commas. The app shows that type's pace, feel and how-to under the session. Paces live only in
+`run_types`, so when they change, update them there and not in the session texts.
+
 **Cutback weeks** (every 4th) stay lighter even if he feels great.
 
 **Mostly easy.** About 80% of running is easy and conversational. Easy runs are judged by effort,
@@ -78,7 +90,7 @@ not pace: in heat and humidity the same effort is slower.
 Friday. Never a bigger long-run jump.
 
 **Paces.** After each time trial or race, run `node tools/coach.mjs paces <distance> <time>` (Daniels
-VDOT). Update the paces in the profile and the plan's targets, and say what changed and why.
+VDOT). Update the paces in `run_types`, and say what changed and why.
 
 **Fuel and water (for answers).**
 - Carbs during exercise: 30-60 g/hour for efforts of 1-2.5 hours (Burke et al. 2011 consensus),

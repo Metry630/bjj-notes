@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.1 (2026-11-09)
+
+- Run tab: every session in This week shows its pace and how it should feel, with "How to run
+  these" underneath, and a "Run types and paces" section explains easy, long, tempo, fast km, race
+  pace, strides and time trials.
+- Speed sessions are in whole km (fast km alternating with easy km, tempo and race-pace blocks) so
+  Strava's automatic km splits show every part; no more 800 m reps with timed jogs.
+
 ## 0.7.0 (2026-11-09)
 
 - Run tab: a running coach for the half marathon. Add Strava screenshots after a run (shrunk on the
