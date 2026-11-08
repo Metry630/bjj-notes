@@ -14,9 +14,10 @@
  *   token) fills the empty cells of that date's row or adds a row in date order; pruneRow deletes
  *   only a row holding nothing but a date (what a failed save used to leave behind).
  * - Only "App · *" tabs are read or written, never "App · Setup" (it shows the tokens).
- * - Phone token: read, add to Inbox/Questions/Feedback/Audio, edit or cancel its own items while
- *   they are still "new", rate a filed note, answer an open decision, set the routine mode, and
- *   start a run (runNow). Agent token: reads, appendSession, any other App tab. It can't start runs.
+ * - Phone token: read, add to Inbox/Questions/Feedback/Audio and Coach/Images (running coach
+ *   messages and Strava screenshots), edit or cancel its own items while they are still "new",
+ *   rate a filed note, answer an open decision, set the routine mode, and start a run (runNow).
+ *   Agent token: reads, appendSession, any other App tab. It can't start runs.
  *
  * Every response is HTTP 200 JSON; check `ok`. Token goes in the JSON body (`token`) or as ?k=.
  */
@@ -32,6 +33,8 @@ const TABS = {
   'App · Log': ['id', 'started_at', 'finished_at', 'mode', 'summary', 'shipped', 'needs_you'],
   'App · Audio': ['id', 'created_at', 'inbox_id', 'seq', 'total', 'mime', 'data', 'status'],
   'App · Decisions': ['id', 'created_at', 'question', 'options', 'recommended', 'status', 'answer', 'answered_at'],
+  'App · Coach': ['id', 'created_at', 'kind', 'run_date', 'text', 'feel', 'pain', 'images', 'status', 'reply', 'replied_at'],
+  'App · Images': ['id', 'created_at', 'coach_id', 'part', 'seq', 'total', 'mime', 'data', 'status'],
 };
 TABS['App · Inbox'] = TABS['App · Inbox'].concat(['method', 'rating']);
 // What the phone may set on its own rows; everything else is server- or agent-set.
@@ -40,12 +43,20 @@ const PHONE_FIELDS = {
   'App · Questions': ['question'],
   'App · Feedback': ['text'],
   'App · Audio': ['inbox_id', 'seq', 'total', 'mime', 'data'],
+  'App · Coach': ['kind', 'run_date', 'text', 'feel', 'pain', 'images'],
+  'App · Images': ['coach_id', 'part', 'seq', 'total', 'mime', 'data'],
 };
 // Fields the phone may change at any time, not only while an item is still "new".
-const PHONE_ANYTIME = { 'App · Inbox': ['rating'] };
+const PHONE_ANYTIME = { 'App · Inbox': ['rating'], 'App · Coach': ['rating'] };
 const DECISIONS_TAB = APP + 'Decisions';
 const METHODS = ['keyboard', 'recording'];
-const CREATED_FIELD = { 'App · Inbox': 'created_at', 'App · Questions': 'asked_at', 'App · Feedback': 'created_at', 'App · Audio': 'created_at' };
+// A coach message is a run report (with screenshots), a question, or the next-morning check.
+const KINDS = ['run', 'ask', 'checkin'];
+const FEELS = ['easy', 'ok', 'hard', 'very hard'];
+const CREATED_FIELD = {
+  'App · Inbox': 'created_at', 'App · Questions': 'asked_at', 'App · Feedback': 'created_at', 'App · Audio': 'created_at',
+  'App · Coach': 'created_at', 'App · Images': 'created_at',
+};
 // Run now: the routine's API trigger. Its token (sk-ant-oat01-...) lives in Script Properties as
 // RUN_TOKEN and can only start this one routine.
 const FIRE_URL = 'https://api.anthropic.com/v1/claude_code/routines/trig_01Afu9HT6okM7SGULQsYokWm/fire';
@@ -505,8 +516,33 @@ function phoneRow_(tab, input) {
   });
   if (row.method != null && METHODS.indexOf(row.method) < 0) throw new Error('bad_method');
   if (tab === 'App · Audio') checkAudio_(row);
+  if (tab === 'App · Coach') checkCoach_(row);
+  if (tab === 'App · Images') checkImage_(row);
   row.status = 'new';
   return row;
+}
+
+function checkCoach_(row) {
+  if (KINDS.indexOf(row.kind) < 0) throw new Error('bad_kind');
+  if (row.run_date != null && row.run_date !== '') isoDate_(row.run_date);
+  if (row.feel != null && row.feel !== '' && FEELS.indexOf(row.feel) < 0) throw new Error('bad_feel');
+  if (row.pain != null && String(row.pain).length > 60) throw new Error('bad_pain');
+  const n = Number(row.images == null || row.images === '' ? 0 : row.images);
+  if (!(Math.floor(n) === n && n >= 0 && n <= 6)) throw new Error('bad_images');
+}
+
+// One base64 slice of one screenshot: part 1..6 of a coach message, slices 1..total of that part.
+function checkImage_(row) {
+  const part = Number(row.part);
+  const seq = Number(row.seq);
+  const total = Number(row.total);
+  const data = String(row.data || '');
+  const ok =
+    row.coach_id && String(row.coach_id).length <= 64 && /^image\/(jpeg|png|webp)$/.test(String(row.mime || '')) &&
+    /^[A-Za-z0-9+\/=]+$/.test(data) && data.length <= MAX_TEXT &&
+    Math.floor(part) === part && part >= 1 && part <= 6 &&
+    Math.floor(seq) === seq && Math.floor(total) === total && seq >= 1 && seq <= total && total <= 200;
+  if (!ok) throw new Error('bad_image');
 }
 
 // One base64 slice of a recording: the routine joins slices 1..total of an inbox item.

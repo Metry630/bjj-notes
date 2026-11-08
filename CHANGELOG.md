@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.7.0 (2026-11-09)
+
+- Run tab: a running coach for the half marathon. Add Strava screenshots after a run (shrunk on the
+  phone to ~50-200 KB), tap how it felt and any pain, and send. Outside 09:00-18:00 that starts a
+  run and the reply shows up in about 5 minutes; in quiet hours it waits for 18:05 (or Reply now).
+- The tab shows the race countdown, this week's runs with what was logged, the long-run ladder and
+  spare weeks, the coach's replies, the run log, the full plan, and a fuel/water/race-day guide.
+- Ask the coach anything (a week without lifting, a missed week); the plan changes in the sheet.
+- One-tap next-morning pain check on the latest run; "No pain" doesn't start a run.
+- Routine: coach chore and weekly close (`COACH.md`), `tools/coach.mjs` for the arithmetic
+  (10% long-run steps, the 30-day spike check, Daniels VDOT paces).
+- Sheet script v4 (one redeploy): coach messages and screenshot slices from the phone, checked.
+
 ## 0.6.1 (2026-11-08)
 
 - Topic index, part 2d: 4 more topics (35 in total).

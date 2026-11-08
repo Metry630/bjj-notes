@@ -150,5 +150,24 @@ details.type summary { color: var(--accent); font-weight: 600; margin: 8px 0; cu
 .cliprow { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 8px; }
 .clip.full { -webkit-line-clamp: unset; display: block; }
 .chips { margin: 8px 0; }
-.chip { display: inline-block; margin: 0 10px 8px 0; padding: 6px 10px; border: 1px solid var(--accent); border-radius: 16px; text-decoration: none; }
-.chip.on { background: var(--accent); color: #fff; }
+.chips .chip { display: inline-block; margin: 0 10px 8px 0; padding: 6px 10px; border: 1px solid var(--accent); border-radius: 16px; text-decoration: none; }
+.chips .chip.on { background: var(--accent); color: #fff; }
+
+/* Run: the running coach. */
+.vh { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
+.filepick { display: flex; align-items: center; justify-content: center; font-size: 1rem; color: var(--accent); margin-top: 0; position: relative; border-radius: 10px; cursor: pointer; }
+.filepick.off { opacity: 0.5; }
+.thumbs { display: flex; flex-wrap: wrap; gap: 8px; }
+.thumbs:empty { display: none; }
+.thumb { display: grid; gap: 2px; justify-items: center; font-size: 0.8rem; }
+.thumb img { width: 84px; height: 150px; object-fit: cover; object-position: top; border-radius: 8px; border: 1px solid var(--line); }
+.picks { display: flex; flex-wrap: wrap; gap: 8px; }
+.pick { min-height: 40px; padding: 6px 14px; border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 999px; }
+.pick.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.sess { display: grid; grid-template-columns: 2.4em minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--line); }
+.runrow, .planrow { border-top: 1px solid var(--line); padding: 8px 0; }
+.planrow.now { border-left: 3px solid var(--accent); padding-left: 8px; }
+.checkrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+.check { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; width: 100%; }
+.check[hidden] { display: none; }
+.card.coachnote { border-left: 4px solid var(--ok); }

@@ -22,9 +22,15 @@
 //   node tools/sheet.mjs audio-done <inbox_id>          clears its slices once transcribed
 //   node tools/sheet.mjs decisions                      open and newly answered decisions
 //
+// Running coach (see COACH.md):
+//   node tools/sheet.mjs coach                          new messages, oldest first
+//   node tools/sheet.mjs coach-context                  profile, plan, recent runs and exchanges, BJJ load
+//   node tools/sheet.mjs images <coach_id> <dir>        writes a message's screenshots as <dir>/<part>.jpg
+//   node tools/sheet.mjs images-done <coach_id>         clears its screenshot slices once read
+//
 // Any *.json argument may be "-" to read from stdin.
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 export function call(action, payload = {}, env = process.env) {
@@ -56,18 +62,68 @@ export function formatNotes(res) {
   return res.rows.map((r) => `${r.row}\t${r.cells.slice(0, 3).join('\t')}\t${r.cells.slice(3).join(' | ')}`).join('\n');
 }
 
-// Joins slices 1..total of one recording. Throws if any slice is missing, so a half-uploaded
-// recording is left for the next run.
-export function assembleAudio(rows, inboxId) {
-  const mine = rows.filter((r) => String(r.inbox_id) === String(inboxId) && r.status !== 'done');
-  if (!mine.length) throw new Error(`no audio for ${inboxId}`);
-  const total = Number(mine[0].total);
-  const bySeq = new Map(mine.map((r) => [Number(r.seq), r]));
+// Joins slices 1..total of one upload (a recording, or one screenshot). Throws if any slice is
+// missing, so a half-uploaded file is left for the next run.
+export function assembleSlices(rows) {
+  const total = Number(rows[0].total);
+  const bySeq = new Map(rows.map((r) => [Number(r.seq), r]));
   const missing = [];
   for (let i = 1; i <= total; i++) if (!bySeq.has(i)) missing.push(i);
   if (missing.length) throw new Error(`incomplete: ${total - missing.length}/${total} slices uploaded`);
   const b64 = Array.from({ length: total }, (_, i) => String(bySeq.get(i + 1).data)).join('');
-  return { bytes: Buffer.from(b64, 'base64'), mime: String(mine[0].mime), slices: total, rowIds: mine.map((r) => r.id) };
+  return { bytes: Buffer.from(b64, 'base64'), mime: String(rows[0].mime), slices: total, rowIds: rows.map((r) => r.id) };
+}
+
+export function assembleAudio(rows, inboxId) {
+  const mine = rows.filter((r) => String(r.inbox_id) === String(inboxId) && r.status !== 'done');
+  if (!mine.length) throw new Error(`no audio for ${inboxId}`);
+  return assembleSlices(mine);
+}
+
+// The screenshots of one coach message, part by part. `expected` is the message's `images` count:
+// fewer parts than that means the phone is still uploading.
+export function assembleImages(rows, coachId, expected) {
+  const mine = rows.filter((r) => String(r.coach_id) === String(coachId) && r.status !== 'done');
+  const parts = [...new Set(mine.map((r) => Number(r.part)))].sort((a, b) => a - b);
+  if (parts.length < Number(expected || 0)) throw new Error(`incomplete: ${parts.length}/${expected} screenshots uploaded`);
+  return parts.map((part) => ({ part, ...assembleSlices(mine.filter((r) => Number(r.part) === part)) }));
+}
+
+const EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+
+// "3/11/26" -> "2026-11-03"; anything else -> "".
+export function isoFromSheet(shown) {
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/.exec(String(shown).trim());
+  if (!m) return '';
+  const y = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
+  return `${y}-${String(m[2]).padStart(2, '0')}-${String(m[1]).padStart(2, '0')}`;
+}
+
+// Everything the coach reads before replying, in one go. JSON cells (race, ladder) are parsed.
+export function coachContext({ profile, plan, runs, coach, notes }, today = new Date().toISOString().slice(0, 10)) {
+  const parse = (v) => {
+    try {
+      return JSON.parse(v);
+    } catch {
+      return v;
+    }
+  };
+  const since = new Date(Date.parse(`${today}T00:00:00Z`) - 14 * 864e5).toISOString().slice(0, 10);
+  const byTime = (key) => (a, b) => String(a[key]).localeCompare(String(b[key]));
+  return {
+    today,
+    profile: Object.fromEntries(profile.filter((r) => !r.hidden).map((r) => [r.id, parse(r.value)])),
+    plan: plan.filter((r) => !r.hidden).map(({ _row, ...w }) => w),
+    recent_runs: runs.filter((r) => !r.hidden).sort(byTime('date')).slice(-12).map(({ _row, ...r }) => r),
+    recent_exchanges: coach
+      .filter((r) => !r.hidden && r.status === 'answered')
+      .sort(byTime('created_at'))
+      .slice(-10)
+      .map((r) => ({ created_at: r.created_at, kind: r.kind, run_date: r.run_date, text: r.text, feel: r.feel, pain: r.pain, reply: r.reply })),
+    bjj_last_14_days: (notes?.rows ?? [])
+      .map((r) => ({ date: isoFromSheet(r.cells[0]), hours: r.cells[2] || '' }))
+      .filter((s) => s.date && s.date >= since && s.date <= today),
+  };
 }
 
 const readJson = (arg) => JSON.parse(arg === '-' ? readFileSync(0, 'utf8') : readFileSync(arg, 'utf8'));
@@ -124,6 +180,40 @@ function main(argv) {
     }
     case 'decisions':
       return print(call('get', { tab: 'App · Decisions' }).rows.filter((r) => r.status === 'open' || (r.status === 'answered' && !r.acted_at)));
+    case 'coach':
+      return print(status(call('get', { tab: 'App · Coach' }).rows, 'new').sort((a, b) => String(a.created_at).localeCompare(String(b.created_at))));
+    case 'coach-context': {
+      const rows = (tab) => {
+        try {
+          return call('get', { tab }).rows;
+        } catch {
+          return []; // tab not made yet
+        }
+      };
+      return print(coachContext({
+        profile: rows('App · Profile'),
+        plan: rows('App · Plan'),
+        runs: rows('App · Runs'),
+        coach: rows('App · Coach'),
+        notes: call('notes'),
+      }, new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Singapore' }).format(new Date())));
+    }
+    case 'images': {
+      const msg = call('get', { tab: 'App · Coach' }).rows.find((r) => String(r.id) === rest[0]);
+      if (!msg) throw new Error(`no coach message ${rest[0]}`);
+      const parts = assembleImages(call('get', { tab: 'App · Images' }).rows, rest[0], msg.images);
+      mkdirSync(rest[1], { recursive: true });
+      return print(parts.map((p) => {
+        const file = `${rest[1]}/${p.part}.${EXT[p.mime] || 'img'}`;
+        writeFileSync(file, p.bytes);
+        return { file, bytes: p.bytes.length, mime: p.mime };
+      }));
+    }
+    case 'images-done': {
+      const rows = call('get', { tab: 'App · Images' }).rows.filter((r) => String(r.coach_id) === rest[0] && r.status !== 'done');
+      for (const r of rows) call('update', { tab: 'App · Images', id: r.id, fields: { data: '', status: 'done' } });
+      return print({ cleared: rows.length });
+    }
     default:
       process.stderr.write('usage: see the header of tools/sheet.mjs\n');
       process.exit(2);

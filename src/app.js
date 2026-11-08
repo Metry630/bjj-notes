@@ -4,9 +4,11 @@ import { search, toCells, highlightTerms, norm, topicCells, topicCounts } from '
 import { byGym, funFacts } from './analysis.js';
 import { enqueue, flush } from './queue.js';
 import { startRecording, blobToBase64, audioBatches } from './recorder.js';
+import { shrink, imageBatches, MAX_IMAGES } from './images.js';
+import { weekOf, sessionDays, profileMap, ladderState, daysBetween, dayLabel } from './training.js';
 import { todayISO, draftDate, isoToSheetDate, nextRunLabel, hoursSince, shortTime } from './dates.js';
 
-export const VERSION = '0.6.1';
+export const VERSION = '0.7.0';
 
 const TABS = {
   inbox: 'App · Inbox',
@@ -16,6 +18,11 @@ const TABS = {
   topics: 'App · Topics',
   audio: 'App · Audio',
   decisions: 'App · Decisions',
+  coach: 'App · Coach',
+  images: 'App · Images',
+  runs: 'App · Runs',
+  plan: 'App · Plan',
+  profile: 'App · Profile',
 };
 const ERRORS = {
   offline: 'No connection.',
@@ -27,6 +34,7 @@ const ERRORS = {
   fire_failed_429: "Claude's limit for runs this hour is reached. Try again later.",
   fire_failed_401: 'The Run now token was replaced or is wrong.',
   fire_failed_400: 'The routine is paused on claude.ai.',
+  forbidden: 'The sheet script is older than this app. Paste and deploy the latest Code.gs, then try again.',
 };
 const errorText = (e) => ERRORS[e.message] || `Something went wrong (${e.message}).`;
 
@@ -47,6 +55,10 @@ const state = {
   log: store.get('log', []),
   topics: store.get('topics', []),
   decisions: store.get('decisions', []),
+  coach: store.get('coach', []),
+  runs: store.get('runs', []),
+  plan: store.get('plan', []),
+  profile: store.get('profile', []),
   queue: store.get('queue', []),
   settings: store.get('settings', { routine_mode: 'normal' }),
   syncedAt: store.get('syncedAt', ''),
@@ -104,12 +116,14 @@ const quietNow = (now = new Date()) => {
 };
 
 let poll = 0;
-// While a run is filing his note, check back every 30 s (only while the app is open).
+const pending = () => state.inbox.some((r) => r.status === 'new') || state.coach.some((r) => r.status === 'new');
+// While a run is filing his note or the coach is replying, check back every 30 s (only while the
+// app is open).
 function startPolling(minutes = 15) {
   clearInterval(poll);
   const until = Date.now() + minutes * 60000;
   poll = setInterval(() => {
-    if (Date.now() > until || !state.inbox.some((r) => r.status === 'new')) {
+    if (Date.now() > until || !pending()) {
       clearInterval(poll);
       poll = 0;
       return;
@@ -118,25 +132,56 @@ function startPolling(minutes = 15) {
   }, 30000);
 }
 
-// Starts a run so new notes are filed now. `auto` = right after a save, which waits in quiet time.
-async function fileNow(msg, { auto = false } = {}) {
+const NOTE_TEXTS = {
+  quiet: () => `Saved. It gets filed at ${runAt()} (quiet hours), or tap File now.`,
+  started: 'Saved. Filing it now: it shows up below, in your sheet, in about 3 minutes.',
+  busy: 'Saved. A run is already going. If it misses this one, tap File now in a few minutes.',
+  failed: (e) => `Saved, but filing could not start: ${errorText(e)}`,
+};
+const COACH_TEXTS = {
+  quiet: () => `Sent. The coach replies at ${runAt()} (quiet hours), or tap Reply now.`,
+  started: 'Sent. The coach is on it: the reply shows up below in about 5 minutes.',
+  busy: 'Sent. A run is already going. If it misses this, tap Reply now in a few minutes.',
+  failed: (e) => `Sent, but the coach could not start: ${errorText(e)}`,
+};
+
+// Starts a run so new notes are filed (or coach messages answered) now. `auto` = right after a
+// save, which waits in quiet time.
+async function fileNow(msg, { auto = false, texts = NOTE_TEXTS } = {}) {
   if (auto && quietNow()) {
-    msg.textContent = `Saved. It gets filed at ${runAt()} (quiet hours), or tap File now.`;
+    msg.textContent = texts.quiet();
     return;
   }
   try {
     await api.call('runNow');
     store.set('runStartedAt', new Date().toISOString());
-    msg.textContent = 'Saved. Filing it now: it shows up below, in your sheet, in about 3 minutes.';
+    msg.textContent = texts.started;
     startPolling();
   } catch (e) {
     if (e.message === 'too_soon') {
-      msg.textContent = 'Saved. A run is already going. If it misses this one, tap File now in a few minutes.';
+      msg.textContent = texts.busy;
       startPolling();
     } else {
-      msg.textContent = `Saved, but filing could not start: ${errorText(e)}`;
+      msg.textContent = texts.failed(e);
     }
   }
+}
+
+// Sends entries in order; whatever can't go out (no signal) waits in the phone's queue.
+async function sendAll(entries, msg, label) {
+  for (let i = 0; i < entries.length; i++) {
+    if (label) msg.textContent = `${label} (${i + 1}/${entries.length})…`;
+    try {
+      await api.call('add', entries[i]);
+    } catch (e) {
+      // A refusal that a retry can't fix would block the queue for good, so it surfaces now.
+      if (e.message === 'unauthorized' || e.message === 'forbidden' || /^bad_/.test(e.message)) throw e;
+      for (const rest of entries.slice(i)) state.queue = enqueue(state.queue, rest);
+      store.set('queue', state.queue);
+      return false;
+    }
+  }
+  return true;
 }
 
 const filingNow = () => hoursSince(store.get('runStartedAt', '')) < 0.25;
@@ -157,21 +202,7 @@ views.log = (root) => {
   const readForm = () => ({ id: draft.id, date: date.value, location: location.value.trim(), hours: hours.value, text: text.value });
   const keep = () => store.set('draft', readForm());
 
-  // Sends entries in order; whatever can't go out (no signal) waits in the phone's queue.
-  async function send(entries, label) {
-    for (let i = 0; i < entries.length; i++) {
-      if (label) msg.textContent = `${label} (${i + 1}/${entries.length})…`;
-      try {
-        await api.call('add', entries[i]);
-      } catch (e) {
-        if (e.message === 'unauthorized') throw e;
-        for (const rest of entries.slice(i)) state.queue = enqueue(state.queue, rest);
-        store.set('queue', state.queue);
-        return false;
-      }
-    }
-    return true;
-  }
+  const send = (entries, label) => sendAll(entries, msg, label);
 
   // -- recorder --
   let recording = null;
@@ -554,6 +585,292 @@ views.ask = (root) => {
   };
 };
 
+// ---- Run: the running coach. A run report (Strava screenshots, how it felt) or a question goes to
+// App · Coach; the next run reads it, logs the run, updates the plan and replies here. ----
+
+const FEELS = [['easy', 'Easy'], ['ok', 'OK'], ['hard', 'Hard'], ['very hard', 'Very hard']];
+const PAINS = [['none', 'None'], ['shin', 'Shin'], ['hamstring', 'Hamstring'], ['other', 'Other']];
+const KIND_LABEL = { run: 'Run', ask: 'Question', checkin: 'Morning check' };
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+// Pick one; tapping the chosen one again clears it.
+function picker(options) {
+  let value = '';
+  const set = (v) => {
+    value = v;
+    buttons.forEach((b, i) => b.classList.toggle('on', options[i][0] === v));
+  };
+  const buttons = options.map(([v, label]) => h('button', { type: 'button', class: 'pick', onclick: () => set(value === v ? '' : v) }, label));
+  return { el: h('div', { class: 'picks' }, buttons), value: () => value, reset: () => set('') };
+}
+
+views.run = (root) => {
+  const top = h('div');
+  const msg = h('p', { class: 'msg', role: 'status' });
+  const thread = h('div');
+  const more = h('div');
+  const sayStarted = () => fileNow(msg, { texts: COACH_TEXTS });
+
+  // -- log a run: screenshots, two taps, an optional note --
+  let shots = [];
+  const file = h('input', { type: 'file', accept: 'image/*', multiple: true, class: 'vh' });
+  // A label opens the photo picker natively; iOS won't always open a hidden input from code.
+  const addShots = h('label', { class: 'secondary filepick' }, h('span', null, 'Add Strava screenshots'), file);
+  const thumbs = h('div', { class: 'thumbs' });
+  const drawThumbs = () => {
+    fill(thumbs, shots.map((s, i) =>
+      h('div', { class: 'thumb' },
+        h('img', { src: s.dataUrl, alt: `Screenshot ${i + 1}` }),
+        h('button', { type: 'button', class: 'link', onclick: () => { shots.splice(i, 1); drawThumbs(); } }, 'Remove')
+      )
+    ));
+    addShots.firstChild.textContent = shots.length ? 'Add more screenshots' : 'Add Strava screenshots';
+    file.disabled = shots.length >= MAX_IMAGES;
+    addShots.classList.toggle('off', file.disabled);
+  };
+  file.addEventListener('change', async () => {
+    const files = [...file.files].slice(0, MAX_IMAGES - shots.length);
+    file.value = '';
+    if (!files.length) return;
+    msg.textContent = 'Preparing screenshots…';
+    let failed = 0;
+    for (const f of files) {
+      try {
+        shots.push(await shrink(f));
+      } catch {
+        failed++;
+      }
+    }
+    msg.textContent = failed ? `${plural(failed, 'file')} could not be read as an image.` : '';
+    drawThumbs();
+  });
+  const date = h('input', { type: 'date', value: todayISO(), required: true });
+  const feel = picker(FEELS);
+  const pain = picker(PAINS);
+  const note = h('textarea', { rows: '3', placeholder: 'Anything else? How it went, where it hurt (optional).' });
+  const sendRun = h('button', { class: 'primary', type: 'submit' }, 'Send to coach');
+  const runForm = h(
+    'form',
+    {
+      onsubmit: async (ev) => {
+        ev.preventDefault();
+        if (!shots.length && !note.value.trim()) return void (msg.textContent = 'Add a screenshot or a few words first.');
+        sendRun.disabled = true;
+        const id = uid();
+        const n = shots.length;
+        try {
+          const sent = await sendAll(
+            [
+              { tab: TABS.coach, rows: [{ id, kind: 'run', run_date: date.value, text: note.value.trim(), feel: feel.value(), pain: pain.value(), images: n }] },
+              ...shots.flatMap((s, i) => imageBatches(id, i + 1, s.b64, s.mime).map((rows) => ({ tab: TABS.images, rows }))),
+            ],
+            msg,
+            n ? `Sending ${plural(n, 'screenshot')}` : 'Sending'
+          );
+          shots = [];
+          drawThumbs();
+          note.value = '';
+          feel.reset();
+          pain.reset();
+          if (!sent) msg.textContent = 'No connection. It is saved on this phone and goes out when you are back online.';
+          else {
+            await refresh();
+            await fileNow(msg, { auto: true, texts: COACH_TEXTS });
+          }
+          update();
+        } catch (e) {
+          msg.textContent = `${errorText(e)} Tap Send to try again.`;
+        } finally {
+          sendRun.disabled = false;
+        }
+      },
+    },
+    addShots,
+    thumbs,
+    h('label', null, 'Date of the run', date),
+    h('div', { class: 'meta' }, 'How did it feel?'),
+    feel.el,
+    h('div', { class: 'meta' }, 'Any pain?'),
+    pain.el,
+    note,
+    sendRun
+  );
+
+  // -- ask: "not lifting this week, can I do more?", "missed a week, now what?" --
+  const ask = h('textarea', { rows: '3', placeholder: 'Not lifting this week, can I do more? Missed a week, what now?' });
+  const askBtn = h('button', { class: 'primary', type: 'submit' }, 'Ask the coach');
+  const askForm = h(
+    'form',
+    {
+      onsubmit: async (ev) => {
+        ev.preventDefault();
+        const t = ask.value.trim();
+        if (!t) return;
+        askBtn.disabled = true;
+        try {
+          await api.call('add', { tab: TABS.coach, rows: [{ id: uid(), kind: 'ask', text: t }] });
+          ask.value = '';
+          await refresh();
+          await fileNow(msg, { auto: true, texts: COACH_TEXTS });
+        } catch (e) {
+          msg.textContent = errorText(e);
+        } finally {
+          askBtn.disabled = false;
+        }
+      },
+    },
+    ask,
+    askBtn
+  );
+
+  // The next-morning pain check (the plan only moves on after a pain-free morning), one tap on the
+  // latest run report.
+  // "No pain" needs no answer, so it waits for the next scheduled run instead of starting one.
+  async function checkin(r, pain, where) {
+    try {
+      await api.call('add', { tab: TABS.coach, rows: [{ id: uid(), kind: 'checkin', run_date: r.run_date, pain, text: where }] });
+      await refresh();
+      if (pain === 'none') msg.textContent = 'Noted. The coach counts it at the next run.';
+      else await fileNow(msg, { auto: true, texts: COACH_TEXTS });
+    } catch (e) {
+      msg.textContent = errorText(e);
+    }
+  }
+  const morning = (r) => {
+    const where = h('input', { type: 'text', placeholder: 'Where, and how bad?', maxlength: '200' });
+    const box = h('div', { class: 'check', hidden: true }, where, h('button', { type: 'button', class: 'primary', onclick: () => checkin(r, 'some', where.value.trim()) }, 'Send'));
+    return h(
+      'div',
+      { class: 'checkrow' },
+      h('span', { class: 'meta' }, 'This morning:'),
+      h('button', { type: 'button', class: 'pick', onclick: () => checkin(r, 'none', '') }, 'No pain'),
+      h('button', { type: 'button', class: 'pick', onclick: () => { box.hidden = false; where.focus(); } }, 'Some pain'),
+      box
+    );
+  };
+
+  root.append(
+    h('h1', null, 'Run'),
+    top,
+    h('h2', null, 'Log a run'),
+    runForm,
+    msg,
+    h('details', { class: 'type' }, h('summary', null, 'Ask the coach'), askForm),
+    thread,
+    more
+  );
+
+  return () => {
+    const today = todayISO();
+    const profile = profileMap(state.profile);
+    const race = profile.race && typeof profile.race === 'object' ? profile.race : null;
+    const week = weekOf(state.plan, today);
+    const ladder = ladderState(profile.ladder);
+    fill(top,
+      race
+        ? h(
+            'div',
+            { class: 'card' },
+            h('strong', null, race.name || 'Race'),
+            h('div', { class: 'meta' }, [
+              race.date ? `${dayLabel(race.date)} ${race.date.slice(0, 4)}` : 'Date to come',
+              race.date ? `${daysBetween(today, race.date)} days to go` : '',
+              race.pen ? `Pen ${race.pen}` : '',
+              race.goal ? `goal ${race.goal}` : '',
+            ].filter(Boolean).join(' · ')),
+            race.confirmed === false ? h('div', { class: 'meta' }, 'Date not announced yet. Tell the coach when it is.') : '',
+            ladder ? h('p', null, ladder) : ''
+          )
+        : h('div', { class: 'card' }, h('p', { class: 'meta' }, 'Your plan shows up here once the coach has set it up.')),
+      week
+        ? h(
+            'div',
+            { class: 'card' },
+            h('div', { class: 'dayhead' }, h('strong', null, `This week · W${week.week} ${week.block}`)),
+            sessionDays(week).map((s) => {
+              const done = state.runs.filter((r) => r.date === s.date);
+              let chip = '';
+              if (done.length) chip = h('span', { class: 'chip ok' }, done.map((r) => `${r.distance_km} km`).join(', '));
+              else if (s.date === today) chip = h('span', { class: 'chip wait' }, 'Today');
+              else if (s.date < today && s.what && !/^rest/i.test(s.what)) chip = h('span', { class: 'chip' }, 'Not logged');
+              return h('div', { class: 'sess' }, h('span', { class: 'meta' }, s.day), h('span', null, s.what || 'Rest'), chip);
+            }),
+            week.note ? h('p', { class: 'note pre' }, week.note) : ''
+          )
+        : ''
+    );
+
+    const items = newest(state.coach.filter((r) => r.status !== 'cancelled' && r.status !== 'test'), 'created_at').slice(0, 15);
+    const lastRun = items.find((r) => r.kind === 'run' && r.run_date);
+    const checked = lastRun && state.coach.some((r) => r.kind === 'checkin' && r.run_date === lastRun.run_date && r.status !== 'cancelled');
+    const sinceRun = lastRun ? daysBetween(lastRun.run_date, today) : 0;
+    fill(thread,
+      items.length ? h('h2', null, 'Coach') : '',
+      items.map((r) => {
+        if (r.kind === 'coach') {
+          return h('div', { class: 'card coachnote' }, h('div', { class: 'meta' }, `Coach · ${shortTime(r.created_at)}`), h('p', { class: 'pre' }, r.text));
+        }
+        const facts = [r.feel ? `felt ${r.feel}` : '', r.pain ? `pain: ${r.pain}` : '', Number(r.images) ? plural(Number(r.images), 'screenshot') : ''].filter(Boolean).join(' · ');
+        let tail = '';
+        if (r.reply) tail = [h('p', { class: 'note pre' }, r.reply), h('div', { class: 'meta' }, `Coach · ${shortTime(r.replied_at)}`)];
+        else if (r.status === 'new') {
+          tail = h(
+            'div',
+            { class: 'meta' },
+            filingNow()
+              ? h('span', { class: 'chip wait' }, 'Coach is replying…')
+              : [h('span', { class: 'chip wait' }, `Reply at ${runAt()}`), ' ', h('button', { class: 'link', type: 'button', onclick: sayStarted }, 'Reply now')],
+            ' ',
+            h('button', { class: 'link', type: 'button', onclick: () => cancel(TABS.coach, r.id) }, 'Remove')
+          );
+        }
+        return h(
+          'div',
+          { class: 'card' },
+          h('div', { class: 'meta' }, `${KIND_LABEL[r.kind] || 'Message'}${r.run_date ? ` · ${dayLabel(r.run_date)}` : ''} · sent ${shortTime(r.created_at)}`),
+          r.text ? h('p', { class: 'pre' }, r.text) : '',
+          facts ? h('div', { class: 'meta' }, facts) : '',
+          tail,
+          r === lastRun && !checked && sinceRun >= 1 && sinceRun <= 2 ? morning(r) : ''
+        );
+      })
+    );
+
+    const runs = [...state.runs]
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.id).localeCompare(String(a.id)))
+      .slice(0, 12);
+    const plan = [...state.plan].sort((a, b) => Number(a.week) - Number(b.week));
+    fill(more,
+      runs.length ? h('h2', null, 'Runs') : '',
+      runs.map((r) =>
+        h(
+          'div',
+          { class: 'runrow' },
+          h('div', null, h('strong', null, dayLabel(r.date)), ` · ${r.distance_km} km`, r.moving ? ` · ${r.moving}` : '', r.pace ? ` · ${r.pace}` : ''),
+          [r.session, r.verdict].some(Boolean) ? h('div', { class: 'meta' }, [r.session, r.verdict].filter(Boolean).join(' · ')) : ''
+        )
+      ),
+      plan.length
+        ? h(
+            'details',
+            null,
+            h('summary', null, 'Full plan'),
+            plan.map((w) =>
+              h(
+                'div',
+                { class: week && w.week === week.week ? 'planrow now' : 'planrow' },
+                h('div', null, h('strong', null, `W${w.week}`), ` ${dayLabel(w.start)} · ${w.block}`, w.status && w.status !== 'planned' ? [' ', h('span', { class: 'chip' }, w.status)] : ''),
+                h('div', { class: 'meta' }, `Fri ${w.fri || 'rest'} · Sat ${w.sat || 'rest'} · Sun ${w.sun || 'rest'}`)
+              )
+            )
+          )
+        : '',
+      profile.guide ? h('details', null, h('summary', null, 'Fuel, water and race day'), h('p', { class: 'pre' }, profile.guide)) : ''
+    );
+    store.set('seenReplies', state.coach.filter((r) => r.reply).map((r) => r.id));
+  };
+};
+
 views.home = (root) => {
   const modes = h('div', { class: 'modes' });
   const fbText = h('textarea', { rows: '3', placeholder: 'Feedback for Claude: what to change, what is annoying, what you want next.' });
@@ -569,7 +886,7 @@ views.home = (root) => {
     runMsg.textContent = 'Starting…';
     try {
       await api.call('runNow');
-      runMsg.textContent = 'Started. New notes, recordings and questions are handled in about 5 minutes. Tap Refresh at the top after that.';
+      runMsg.textContent = 'Started. New notes, recordings, questions and coach messages are handled in about 5 minutes. Tap Refresh at the top after that.';
     } catch (e) {
       runMsg.textContent = errorText(e);
     } finally {
@@ -831,9 +1148,12 @@ function show(view) {
 function drawNav() {
   const seen = new Set(store.get('seenAnswers', []));
   const newAnswers = state.questions.filter((r) => r.status === 'answered' && !seen.has(r.id)).length;
+  const seenReplies = new Set(store.get('seenReplies', []));
+  const newReplies = state.coach.filter((r) => r.reply && !seenReplies.has(r.id)).length;
   const needs = state.decisions.filter((d) => d.status === 'open').length || (newest(state.log, 'started_at')[0]?.needs_you ? 1 : 0);
   const items = [
     ['log', 'Log', 0],
+    ['run', 'Run', newReplies],
     ['search', 'Search', 0],
     ['ask', 'Ask', newAnswers],
     ['analysis', 'Stats', 0],
@@ -865,7 +1185,7 @@ async function refresh() {
       store.set('queue', state.queue);
       if (res.error && res.error.message !== 'offline') setStatus(errorText(res.error));
     }
-    const keys = ['notes', 'inbox', 'questions', 'feedback', 'log', 'topics', 'settings', 'decisions'];
+    const keys = ['notes', 'inbox', 'questions', 'feedback', 'log', 'topics', 'settings', 'decisions', 'coach', 'runs', 'plan', 'profile'];
     const results = await api.batch([
       { action: 'notes' },
       { action: 'get', tab: TABS.inbox },
@@ -875,6 +1195,10 @@ async function refresh() {
       { action: 'get', tab: TABS.topics },
       { action: 'settings' },
       { action: 'get', tab: TABS.decisions },
+      { action: 'get', tab: TABS.coach },
+      { action: 'get', tab: TABS.runs },
+      { action: 'get', tab: TABS.plan },
+      { action: 'get', tab: TABS.profile },
     ]);
     results.forEach((r, i) => {
       if (!r.ok) return;

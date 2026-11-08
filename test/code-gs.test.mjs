@@ -39,7 +39,7 @@ test('notes returns session rows after the Total row', () => {
 
 test('setup makes hidden app tabs, a visible setup tab, and opens the closed Total range', () => {
   const { ss, sheet1, props } = ready();
-  for (const t of ['App · Inbox', 'App · Questions', 'App · Feedback', 'App · Log']) {
+  for (const t of ['App · Inbox', 'App · Questions', 'App · Feedback', 'App · Log', 'App · Coach', 'App · Images']) {
     assert.equal(ss.getSheetByName(t).hidden, true, t);
   }
   const setupTab = ss.getSheetByName('App · Setup');
@@ -192,6 +192,70 @@ test('phone uploads recording slices; bad slices are refused', () => {
   assert.equal(bad({ seq: 3, total: 2 }), 'bad_audio');
   assert.equal(bad({ data: 'A'.repeat(40001) }), 'bad_audio');
   assert.equal(post({ action: 'add', tab: 'App · Inbox', rows: [{ text: 'x', method: 'telepathy' }], token: phone }).error, 'bad_method');
+});
+
+test('phone sends coach messages: allowed fields only, checked values, status new', () => {
+  const { post, phone, ss } = ready();
+  const res = post({
+    action: 'add',
+    tab: 'App · Coach',
+    rows: [{ id: 'c1', kind: 'run', run_date: '2026-11-14', text: 'felt fine', feel: 'ok', pain: 'none', images: 2, reply: 'forged', status: 'answered' }],
+    token: phone,
+  });
+  assert.equal(res.ok, true);
+  const row = post({ action: 'get', tab: 'App · Coach', token: phone }).rows[0];
+  assert.equal(row.kind, 'run');
+  assert.equal(row.images, '2');
+  assert.equal(row.status, 'new');
+  assert.equal(row.reply, '');
+  assert.match(row.created_at, /^\d{4}-\d{2}-\d{2}T/);
+  assert.equal(ss.getSheetByName('App · Coach').hidden, true);
+  const bad = (fields) => post({ action: 'add', tab: 'App · Coach', rows: [{ kind: 'ask', text: 'x', ...fields }], token: phone }).error;
+  assert.equal(bad({ kind: 'note' }), 'bad_kind');
+  assert.equal(bad({ run_date: '14/11/26' }), 'bad_date');
+  assert.equal(bad({ feel: 'great' }), 'bad_feel');
+  assert.equal(bad({ pain: 'x'.repeat(61) }), 'bad_pain');
+  assert.equal(bad({ images: 7 }), 'bad_images');
+  assert.equal(bad({ images: 1.5 }), 'bad_images');
+  assert.equal(bad({}), undefined);
+  // He can take back a message the coach hasn't read; a replied one stays.
+  assert.equal(post({ action: 'update', tab: 'App · Coach', id: 'c1', fields: { status: 'cancelled' }, token: phone }).ok, true);
+});
+
+test('phone uploads screenshot slices; bad slices are refused', () => {
+  const { post, phone, ss } = ready();
+  const img = Buffer.from('fake jpeg bytes').toString('base64');
+  const rows = [1, 2].map((seq) => ({ id: `c1.1-${seq}`, coach_id: 'c1', part: 1, seq, total: 2, mime: 'image/jpeg', data: img }));
+  assert.equal(post({ action: 'add', tab: 'App · Images', rows, token: phone }).ok, true);
+  assert.equal(ss.getSheetByName('App · Images').getLastRow(), 3);
+  const bad = (row) => post({ action: 'add', tab: 'App · Images', rows: [{ coach_id: 'c1', part: 1, seq: 1, total: 1, mime: 'image/jpeg', data: img, ...row }], token: phone }).error;
+  assert.equal(bad({ mime: 'image/svg+xml' }), 'bad_image');
+  assert.equal(bad({ mime: 'audio/mp4' }), 'bad_image');
+  assert.equal(bad({ data: '<svg onload=x>' }), 'bad_image');
+  assert.equal(bad({ data: 'A'.repeat(40001) }), 'bad_image');
+  assert.equal(bad({ part: 7 }), 'bad_image');
+  assert.equal(bad({ seq: 3, total: 2 }), 'bad_image');
+  assert.equal(bad({ coach_id: '' }), 'bad_image');
+  // Audio rules are unchanged: an image can't go in as a recording.
+  assert.equal(post({ action: 'add', tab: 'App · Audio', rows: [{ inbox_id: 'r', seq: 1, total: 1, mime: 'image/jpeg', data: img }], token: phone }).error, 'bad_audio');
+});
+
+test('the plan, runs and profile are the coach agent’s: phone reads them, cannot write them', () => {
+  const { post, phone, agent } = ready();
+  for (const tab of ['App · Plan', 'App · Runs', 'App · Profile']) {
+    assert.equal(post({ action: 'add', tab, rows: [{ id: 'x', note: 'n' }], token: agent }).ok, true, tab);
+    assert.equal(post({ action: 'add', tab, rows: [{ id: 'y', note: 'n' }], token: phone }).error, 'forbidden', tab);
+    assert.equal(post({ action: 'update', tab, id: 'x', fields: { note: 'changed' }, token: phone }).error, 'forbidden', tab);
+    assert.equal(post({ action: 'get', tab, token: phone }).rows[0].note, 'n', tab);
+  }
+  // The coach replies on his message; the phone can't forge a reply.
+  post({ action: 'add', tab: 'App · Coach', rows: [{ id: 'm1', kind: 'ask', text: 'q' }], token: phone });
+  assert.equal(post({ action: 'update', tab: 'App · Coach', id: 'm1', fields: { reply: 'r' }, token: phone }).error, 'forbidden_field');
+  assert.equal(post({ action: 'update', tab: 'App · Coach', id: 'm1', fields: { reply: 'Do 5.5 km.', status: 'answered' }, token: agent }).ok, true);
+  assert.equal(post({ action: 'update', tab: 'App · Coach', id: 'm1', fields: { status: 'cancelled' }, token: phone }).error, 'already_processed');
+  // Rating a reply is allowed any time, 1 to 5 only.
+  assert.equal(post({ action: 'update', tab: 'App · Coach', id: 'm1', fields: { rating: 4 }, token: phone }).ok, true);
+  assert.equal(post({ action: 'update', tab: 'App · Coach', id: 'm1', fields: { rating: 9 }, token: phone }).error, 'bad_rating');
 });
 
 test('inbox tabs from v1 gain method and rating columns', () => {

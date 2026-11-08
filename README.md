@@ -1,14 +1,15 @@
 # bjj-notes
 
 Dictate BJJ notes on your phone after training, keep them in a Google Sheet, search them instantly
-and ask questions that get answered from your own notes.
+and ask questions that get answered from your own notes. The Run tab is a running coach: send
+Strava screenshots after a run and get a reply and an adjusted plan.
 
 - **App:** static files on GitHub Pages (`index.html`, `src/`). No build, no dependencies.
 - **Data:** a Google Sheet, reached only through the Apps Script in `apps-script/Code.gs`. The
   notes tab is append-only through it.
 - **Brains:** a Claude Code routine that runs twice a day. It files dictated notes into the sheet,
-  answers questions, and works through `BACKLOG.md` one item per run. Its instructions are in
-  `CLAUDE.md`.
+  answers questions, coaches runs (`COACH.md`), and works through `BACKLOG.md` one item per run.
+  Its instructions are in `CLAUDE.md`.
 
 Why it's built like this: `DECISIONS.md`.
 

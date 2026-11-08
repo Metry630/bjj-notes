@@ -3,7 +3,8 @@
 // the sheet API go straight through.
 const CACHE = 'bjj-notes-shell';
 const SHELL = ['./', 'index.html', 'style.css', 'manifest.webmanifest', 'icon.svg', 'icon-180.png',
-  'src/app.js', 'src/analysis.js', 'src/api.js', 'src/dates.js', 'src/queue.js', 'src/recorder.js', 'src/search.js', 'src/store.js'];
+  'src/app.js', 'src/analysis.js', 'src/api.js', 'src/dates.js', 'src/images.js', 'src/queue.js', 'src/recorder.js',
+  'src/search.js', 'src/store.js', 'src/training.js'];
 
 self.addEventListener('install', (ev) => {
   ev.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

@@ -44,6 +44,8 @@ His requests (from `App · Feedback`) always go above your own items.
 
 ## Done
 
+- [x] v0.7.0: Run tab, a running coach (Strava screenshots, replies, plan, ladder, guide).
+
 - [x] v0.3.0: Record button (voice notes transcribed by Whisper in the runs, free per use),
       accuracy rating for typed vs recorded notes, Run now button, decision buttons on Home.
 - [x] v0.2.1-0.2.4: Topic index, parts 1-2c (31 topics with summaries, shown first in Search).
