@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.4 (2026-11-09)
+
+- Search: more spelling variants count as the same thing (body lock / bodylock, single leg / singleleg, shrimp / hip escape and more).
+
 ## 0.7.3 (2026-11-09)
 
 - Record screen: a Test switch. A recording saved with it on is transcribed but never filed in the sheet.

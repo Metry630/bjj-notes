@@ -226,3 +226,14 @@ test('topic browser: counts tips by topic and aliases, most first', () => {
   assert.deepEqual(counts.map((c) => c.count), [2, 1, 0]);
   assert.equal(topicCells(cells, topics[0])[0].text, 'closed guard posture');
 });
+
+test('aliases: spaced and joined spellings find each other', () => {
+  const pairs = [['single leg', 'singleleg'], ['body lock', 'bodylock'], ['tech standup', 'technical stand up'],
+    ['hip escape', 'shrimp'], ['whizzer', 'wizzer'], ['re guard', 'reguard'], ['deep half', 'deephalf']];
+  for (const [a, b] of pairs) {
+    assert.ok(expand(a).includes(b), `${a} -> ${b}`);
+    assert.ok(expand(b).includes(a), `${b} -> ${a}`);
+  }
+  const c = [{ row: 1, date: '', location: '', text: 'bodylock pass' }];
+  assert.equal(search(c, 'body lock').length, 1);
+});

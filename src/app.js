@@ -8,7 +8,7 @@ import { shrink, imageBatches, MAX_IMAGES } from './images.js';
 import { weekOf, sessionDays, profileMap, ladderState, daysBetween, dayLabel, runTypes, sessionPaces, paceSummary } from './training.js';
 import { todayISO, draftDate, isoToSheetDate, nextRunLabel, hoursSince, shortTime } from './dates.js';
 
-export const VERSION = '0.7.3';
+export const VERSION = '0.7.4';
 
 const TABS = {
   inbox: 'App · Inbox',

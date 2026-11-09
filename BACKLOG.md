@@ -35,7 +35,7 @@ His requests (from `App · Feedback`) always go above your own items.
       shows the summary and the matching tips with dates. Add a topic filter on Search.
 - [x] **Topic index, part 2d.** Shipped 0.6.1: 4 more topics (35 in total). From then on, each run refreshes only
       the topics that newly filed notes touch.
-- [ ] **Search synonyms from his notes.** Grow `ALIASES` in `src/search.js` from the spellings he
+- [x] **Search synonyms from his notes.** Shipped 0.7.4. Grow `ALIASES` in `src/search.js` from the spellings he
       actually uses (e.g. halfguard / half guard, sidecontrol, backtake), with tests.
 - [ ] **Pull to refresh and a sync indicator** on every screen.
 
