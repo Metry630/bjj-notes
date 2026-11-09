@@ -178,3 +178,13 @@ details.type summary { color: var(--accent); font-weight: 600; margin: 8px 0; cu
 .pacerow { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--line); }
 .dayhead + .pacerow { border-top: 0; }
 .pacerow .meta { grid-column: 1 / -1; }
+
+.nav { position: fixed; }
+.moremenu {
+  position: absolute; right: 8px; bottom: calc(100% + 6px);
+  display: grid; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+}
+.moremenu[hidden] { display: none; }
+.moremenu button { min-height: 48px; min-width: 120px; background: none; border: 0; color: var(--muted); font-weight: 600; text-align: left; padding: 0 16px; }
+.moremenu button.on { color: var(--accent); }
+.coachlog > summary { font-size: 1.1rem; font-weight: 700; margin: 12px 0 8px; }

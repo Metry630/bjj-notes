@@ -237,3 +237,14 @@ test('aliases: spaced and joined spellings find each other', () => {
   const c = [{ row: 1, date: '', location: '', text: 'bodylock pass' }];
   assert.equal(search(c, 'body lock').length, 1);
 });
+
+import { navItems } from '../src/nav.js';
+
+test('nav: four main tabs plus More; Stats and Home live under More', () => {
+  const items = navItems('analysis', { run: 2, home: 1 });
+  assert.deepEqual(items.map((i) => i.v), ['log', 'run', 'search', 'ask', 'more']);
+  assert.equal(items.find((i) => i.v === 'more').on, true);
+  assert.equal(items.find((i) => i.v === 'more').badge, 1);
+  assert.equal(items.find((i) => i.v === 'run').badge, 2);
+  assert.equal(navItems('log').find((i) => i.v === 'log').on, true);
+});

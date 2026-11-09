@@ -7,8 +7,9 @@ import { startRecording, blobToBase64, audioBatches, TEST_MARK } from './recorde
 import { shrink, imageBatches, MAX_IMAGES } from './images.js';
 import { weekOf, sessionDays, profileMap, ladderState, daysBetween, dayLabel, runTypes, sessionPaces, paceSummary } from './training.js';
 import { todayISO, draftDate, isoToSheetDate, nextRunLabel, hoursSince, shortTime } from './dates.js';
+import { navItems, MORE } from './nav.js';
 
-export const VERSION = '0.7.4';
+export const VERSION = '0.8.0';
 
 const TABS = {
   inbox: 'App · Inbox',
@@ -836,9 +837,13 @@ views.run = (root) => {
     const lastRun = items.find((r) => r.kind === 'run' && r.run_date);
     const checked = lastRun && state.coach.some((r) => r.kind === 'checkin' && r.run_date === lastRun.run_date && r.status !== 'cancelled');
     const sinceRun = lastRun ? daysBetween(lastRun.run_date, today) : 0;
+    const unseen = state.coach.some((r) => r.reply && !new Set(store.get('seenReplies', [])).has(r.id));
+    const logOpen = store.get('coachLogOpen', false) || unseen;
     fill(thread,
-      items.length ? h('h2', null, 'Coach') : '',
-      items.map((r) => {
+      items.length
+        ? h('details', { class: 'coachlog', open: logOpen ? true : null, ontoggle: (e) => store.set('coachLogOpen', e.target.open) },
+            h('summary', null, `Coach log (${items.length})`),
+            items.map((r) => {
         if (r.kind === 'coach') {
           return h('div', { class: 'card coachnote' }, h('div', { class: 'meta' }, `Coach · ${shortTime(r.created_at)}`), h('p', { class: 'pre' }, r.text));
         }
@@ -865,7 +870,8 @@ views.run = (root) => {
           tail,
           r === lastRun && !checked && sinceRun >= 1 && sinceRun <= 2 ? morning(r) : ''
         );
-      })
+      }))
+        : ''
     );
 
     const runs = [...state.runs]
@@ -1196,18 +1202,18 @@ function drawNav() {
   const seenReplies = new Set(store.get('seenReplies', []));
   const newReplies = state.coach.filter((r) => r.reply && !seenReplies.has(r.id)).length;
   const needs = state.decisions.filter((d) => d.status === 'open').length || (newest(state.log, 'started_at')[0]?.needs_you ? 1 : 0);
-  const items = [
-    ['log', 'Log', 0],
-    ['run', 'Run', newReplies],
-    ['search', 'Search', 0],
-    ['ask', 'Ask', newAnswers],
-    ['analysis', 'Stats', 0],
-    ['home', 'Home', needs],
-  ];
-  fill(nav, items.map(([v, label, badge]) =>
-      h('button', { class: state.view === v ? 'on' : '', onclick: () => show(v) }, label, badge ? h('span', { class: 'badge' }, String(badge)) : '')
+  const items = navItems(state.view, { run: newReplies, ask: newAnswers, home: needs });
+  const menu = h('div', { class: 'moremenu', hidden: true },
+    MORE.map(([v, label]) =>
+      h('button', { class: state.view === v ? 'on' : '', onclick: () => show(v) }, label, v === 'home' && needs ? h('span', { class: 'badge' }, String(needs)) : '')
     )
   );
+  fill(nav, [
+    ...items.map(({ v, label, badge, on }) =>
+      h('button', { class: on ? 'on' : '', onclick: v === 'more' ? () => { menu.hidden = !menu.hidden; } : () => show(v) }, label, badge ? h('span', { class: 'badge' }, String(badge)) : '')
+    ),
+    menu,
+  ]);
 }
 
 function setStatus(text) {

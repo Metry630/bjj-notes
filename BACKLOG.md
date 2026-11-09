@@ -5,6 +5,8 @@ His requests (from `App · Feedback`) always go above your own items.
 
 ## Up next
 
+- [x] **Tidy the nav bar and collapse the coach log** (he asked, 9 Nov). Shipped 0.8.0. Reading chosen: four tabs
+      plus a More menu (Stats, Home); the coach log on Run is a collapsible section.
 - [x] **Test mode for recordings** (he asked, 8 Nov). Shipped 0.7.3. Reading chosen: a "Test" switch on the record
       screen; a recording saved with it on is marked as a test and never filed to Sheet1. Cancel
       while uploading already exists, so keep it and make it easy to find.

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.0 (2026-11-10)
+
+- Bottom bar tidied: Log, Run, Search, Ask and a More menu (Stats, Home).
+- Run: the coach log sits in its own collapsible section, closed by default, open when there is a new reply.
+
 ## 0.7.4 (2026-11-09)
 
 - Search: more spelling variants count as the same thing (body lock / bodylock, single leg / singleleg, shrimp / hip escape and more).
