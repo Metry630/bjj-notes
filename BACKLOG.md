@@ -39,7 +39,7 @@ His requests (from `App · Feedback`) always go above your own items.
       the topics that newly filed notes touch.
 - [x] **Search synonyms from his notes.** Shipped 0.7.4. Grow `ALIASES` in `src/search.js` from the spellings he
       actually uses (e.g. halfguard / half guard, sidecontrol, backtake), with tests.
-- [ ] **Pull to refresh and a sync indicator** on every screen.
+- [x] **Pull to refresh and a sync indicator** on every screen. Shipped 0.9.0.
 
 ## Later
 

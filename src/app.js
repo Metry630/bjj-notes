@@ -7,9 +7,10 @@ import { startRecording, blobToBase64, audioBatches, TEST_MARK } from './recorde
 import { shrink, imageBatches, MAX_IMAGES } from './images.js';
 import { weekOf, sessionDays, profileMap, ladderState, daysBetween, dayLabel, runTypes, sessionPaces, paceSummary } from './training.js';
 import { todayISO, draftDate, isoToSheetDate, nextRunLabel, hoursSince, shortTime } from './dates.js';
+import { attachPull } from './pull.js';
 import { navItems, MORE } from './nav.js';
 
-export const VERSION = '0.8.0';
+export const VERSION = '0.9.0';
 
 const TABS = {
   inbox: 'App · Inbox',
@@ -1155,6 +1156,7 @@ views.analysis = (root) => {
 const main = document.getElementById('main');
 const nav = document.getElementById('nav');
 const statusEl = document.getElementById('status');
+const pullEl = document.getElementById('pull');
 let update = () => {};
 
 function show(view) {
@@ -1218,6 +1220,7 @@ function drawNav() {
 
 function setStatus(text) {
   state.status = text;
+  statusEl.classList.toggle('syncing', text === 'Syncing…');
   fill(statusEl, text,
     ' ',
     h('button', { class: 'link', onclick: () => refresh() }, 'Refresh')
@@ -1291,6 +1294,7 @@ async function checkVersion() {
 }
 
 window.addEventListener('online', () => refresh());
+attachPull(document, () => refresh(), pullEl);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 document.addEventListener('visibilitychange', () => {

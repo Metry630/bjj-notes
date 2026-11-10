@@ -248,3 +248,13 @@ test('nav: four main tabs plus More; Stats and Home live under More', () => {
   assert.equal(items.find((i) => i.v === 'run').badge, 2);
   assert.equal(navItems('log').find((i) => i.v === 'log').on, true);
 });
+
+import { pullDistance, shouldRefresh, THRESHOLD } from '../src/pull.js';
+
+test('pull to refresh: only from the top, damped, and past the threshold', () => {
+  assert.equal(pullDistance(100, 300, 40), 0);
+  assert.equal(pullDistance(100, 80, 0), 0);
+  assert.equal(shouldRefresh(pullDistance(100, 140, 0)), false);
+  assert.equal(shouldRefresh(pullDistance(100, 100 + THRESHOLD * 2, 0)), true);
+  assert.ok(pullDistance(0, 5000, 0) <= THRESHOLD * 1.5);
+});

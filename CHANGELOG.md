@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.0 (2026-11-10)
+
+- Pull down from the top of any screen to sync. A small spinner shows next to the status line while it syncs.
+
 ## 0.8.0 (2026-11-10)
 
 - Bottom bar tidied: Log, Run, Search, Ask and a More menu (Stats, Home).
