@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.1 (2026-11-11)
+
+- Usability pass: Home is back in the bottom bar (one tap instead of two, it holds decisions and the run log). Stats opens from a button on Home. The More menu is gone.
+
 ## 0.9.0 (2026-11-10)
 
 - Pull down from the top of any screen to sync. A small spinner shows next to the status line while it syncs.

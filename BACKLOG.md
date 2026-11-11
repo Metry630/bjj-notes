@@ -5,6 +5,9 @@ His requests (from `App · Feedback`) always go above your own items.
 
 ## Up next
 
+- [~] **Usability review** (he asked, 11 Nov). Reading chosen: count taps to each screen and remove the
+      slowest. Part 1 shipped 0.9.1: Home in the bottom bar (was 2 taps), Stats from a button on Home.
+      Next: review the Log screen and Search for extra taps.
 - [x] **Tidy the nav bar and collapse the coach log** (he asked, 9 Nov). Shipped 0.8.0. Reading chosen: four tabs
       plus a More menu (Stats, Home); the coach log on Run is a collapsible section.
 - [x] **Test mode for recordings** (he asked, 8 Nov). Shipped 0.7.3. Reading chosen: a "Test" switch on the record

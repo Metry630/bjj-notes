@@ -8,9 +8,9 @@ import { shrink, imageBatches, MAX_IMAGES } from './images.js';
 import { weekOf, sessionDays, profileMap, ladderState, daysBetween, dayLabel, runTypes, sessionPaces, paceSummary } from './training.js';
 import { todayISO, draftDate, isoToSheetDate, nextRunLabel, hoursSince, shortTime } from './dates.js';
 import { attachPull } from './pull.js';
-import { navItems, MORE } from './nav.js';
+import { navItems } from './nav.js';
 
-export const VERSION = '0.9.0';
+export const VERSION = '0.9.1';
 
 const TABS = {
   inbox: 'App · Inbox',
@@ -952,6 +952,7 @@ views.home = (root) => {
     runs,
     runBtn,
     runMsg,
+    h('button', { class: 'secondary wide', type: 'button', onclick: () => show('analysis') }, 'Stats and fun facts'),
     stats,
     h('h2', null, 'Routine'),
     modes,
@@ -1205,17 +1206,9 @@ function drawNav() {
   const newReplies = state.coach.filter((r) => r.reply && !seenReplies.has(r.id)).length;
   const needs = state.decisions.filter((d) => d.status === 'open').length || (newest(state.log, 'started_at')[0]?.needs_you ? 1 : 0);
   const items = navItems(state.view, { run: newReplies, ask: newAnswers, home: needs });
-  const menu = h('div', { class: 'moremenu', hidden: true },
-    MORE.map(([v, label]) =>
-      h('button', { class: state.view === v ? 'on' : '', onclick: () => show(v) }, label, v === 'home' && needs ? h('span', { class: 'badge' }, String(needs)) : '')
-    )
-  );
-  fill(nav, [
-    ...items.map(({ v, label, badge, on }) =>
-      h('button', { class: on ? 'on' : '', onclick: v === 'more' ? () => { menu.hidden = !menu.hidden; } : () => show(v) }, label, badge ? h('span', { class: 'badge' }, String(badge)) : '')
-    ),
-    menu,
-  ]);
+  fill(nav, items.map(({ v, label, badge, on }) =>
+    h('button', { class: on ? 'on' : '', onclick: () => show(v) }, label, badge ? h('span', { class: 'badge' }, String(badge)) : '')
+  ));
 }
 
 function setStatus(text) {
