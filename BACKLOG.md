@@ -46,8 +46,8 @@ His requests (from `App · Feedback`) always go above your own items.
 
 ## Later
 
-- [ ] "Before class" screen: his last 3 sessions plus one older topic to review. Ask first
-      (`App · Decisions`), since it adds a screen he didn't request.
+- [ ] "Before class" screen: his last 3 sessions plus one older topic to review. He said yes (11 Nov).
+      Build next, after the usability review.
 - [ ] Monthly hours and sessions on Home.
 
 ## Done
