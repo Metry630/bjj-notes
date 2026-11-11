@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.2 (2026-11-12)
+
+- Usability pass, part 2: Search opens with the keyboard ready, and the Log screen remembers if you left "Type instead" open. One tap less each time.
+
 ## 0.9.1 (2026-11-11)
 
 - Usability pass: Home is back in the bottom bar (one tap instead of two, it holds decisions and the run log). Stats opens from a button on Home. The More menu is gone.

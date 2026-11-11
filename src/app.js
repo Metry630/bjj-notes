@@ -10,7 +10,7 @@ import { todayISO, draftDate, isoToSheetDate, nextRunLabel, hoursSince, shortTim
 import { attachPull } from './pull.js';
 import { navItems } from './nav.js';
 
-export const VERSION = '0.9.1';
+export const VERSION = '0.9.2';
 
 const TABS = {
   inbox: 'App · Inbox',
@@ -357,7 +357,7 @@ views.log = (root) => {
     text,
     save
   );
-  const typeBox = h('details', { class: 'type', open: draft.text ? true : null }, h('summary', null, 'Type instead'), typeForm);
+  const typeBox = h('details', { class: 'type', open: draft.text || store.get('typeOpen', false) ? true : null, ontoggle: (e) => store.set('typeOpen', e.target.open) }, h('summary', null, 'Type instead'), typeForm);
 
   root.append(
     h('h1', null, 'Log a session'),
@@ -459,6 +459,7 @@ views.search = (root) => {
   });
   const chips = h('div', { class: 'chips' });
   root.append(h('h1', null, 'Search your notes'), input, chips, out);
+  if (!state.query) setTimeout(() => input.focus(), 0);
 
   function drawChips(cells) {
     const counts = topicCounts(state.topics, cells).filter((c) => c.count > 0);
