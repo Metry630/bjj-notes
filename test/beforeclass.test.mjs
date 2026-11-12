@@ -29,7 +29,7 @@ test('reviewTopic: skips topics in recent sessions and topics with no tips', () 
   const r = reviewTopic(cells, topics, s, '2025-01-20');
   assert.ok(['Closed guard', 'Knee shield'].includes(r.topic));
   assert.notEqual(r.topic, 'Mount');
-  assert.equal(r, reviewTopic(cells, topics, s, '2025-01-20'));
+  assert.deepEqual(r, reviewTopic(cells, topics, s, '2025-01-20'));
 });
 
 test('reviewTopic: null when nothing qualifies', () => {
