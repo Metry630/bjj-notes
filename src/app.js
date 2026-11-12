@@ -1,7 +1,7 @@
 import { store } from './store.js';
 import { makeApi, parseLink } from './api.js';
 import { search, toCells, highlightTerms, norm, topicCells, topicCounts } from './search.js';
-import { byGym, funFacts } from './analysis.js';
+import { byGym, funFacts, monthStats } from './analysis.js';
 import { lastSessions, reviewTopic } from './beforeclass.js';
 import { enqueue, flush } from './queue.js';
 import { startRecording, blobToBase64, audioBatches, TEST_MARK } from './recorder.js';
@@ -11,7 +11,7 @@ import { todayISO, draftDate, isoToSheetDate, nextRunLabel, hoursSince, shortTim
 import { attachPull } from './pull.js';
 import { navItems } from './nav.js';
 
-export const VERSION = '0.10.0';
+export const VERSION = '0.10.1';
 
 const TABS = {
   inbox: 'App · Inbox',
@@ -1089,6 +1089,9 @@ views.home = (root) => {
     };
     fill(stats, sessions.length
         ? h('p', { class: 'meta' }, `${state.notes.total_hours || '?'} hours over ${sessions.length} sessions. Last: ${sessions[sessions.length - 1].cells[0]}.`)
+        : '',
+      sessions.length
+        ? h('p', { class: 'meta' }, monthStats(state.notes, todayISO()).map((m) => `${m.label}: ${m.hours} h, ${m.sessions} sessions`).join(' · '))
         : '',
       h('p', { class: 'meta' }, `Dictation accuracy (your ratings): typed ${avg('keyboard')}, recorded ${avg('recording')}.`)
     );

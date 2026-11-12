@@ -103,3 +103,23 @@ export function funFacts(notes) {
   facts.push({ label: 'Total', value: `${total} hours over ${rows.length} sessions` });
   return facts;
 }
+
+// Hours and sessions per calendar month, for the month of `todayIso` and the one before.
+// Returns [{ key: 'YYYY-MM', label, hours, sessions }], this month first.
+export function monthStats(notes, todayIso) {
+  const y = Number(todayIso.slice(0, 4));
+  const m = Number(todayIso.slice(5, 7));
+  const prev = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+  const keys = [todayIso.slice(0, 7), prev];
+  const out = keys.map((key) => ({ key, label: MONTHS[Number(key.slice(5)) - 1], hours: 0, sessions: 0 }));
+  const seen = new Set();
+  for (const r of notes?.rows ?? []) {
+    const iso = sheetDateToISO(r.cells[0]);
+    const slot = out.find((o) => o.key === iso.slice(0, 7));
+    if (!slot) continue;
+    slot.hours += parseFloat(r.cells[2]) || 0;
+    if (!seen.has(iso)) slot.sessions += 1;
+    seen.add(iso);
+  }
+  return out;
+}

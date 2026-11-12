@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.1 (2026-11-13)
+
+- Home shows hours and sessions for this month and last month.
+
 ## 0.10.0 (2026-11-12)
 
 - New "Before class" screen (button on Home): your last 3 sessions plus one older topic to review. The topic changes daily.
