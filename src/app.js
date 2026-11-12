@@ -2,6 +2,7 @@ import { store } from './store.js';
 import { makeApi, parseLink } from './api.js';
 import { search, toCells, highlightTerms, norm, topicCells, topicCounts } from './search.js';
 import { byGym, funFacts } from './analysis.js';
+import { lastSessions, reviewTopic } from './beforeclass.js';
 import { enqueue, flush } from './queue.js';
 import { startRecording, blobToBase64, audioBatches, TEST_MARK } from './recorder.js';
 import { shrink, imageBatches, MAX_IMAGES } from './images.js';
@@ -10,7 +11,7 @@ import { todayISO, draftDate, isoToSheetDate, nextRunLabel, hoursSince, shortTim
 import { attachPull } from './pull.js';
 import { navItems } from './nav.js';
 
-export const VERSION = '0.9.2';
+export const VERSION = '0.10.0';
 
 const TABS = {
   inbox: 'App · Inbox',
@@ -953,6 +954,7 @@ views.home = (root) => {
     runs,
     runBtn,
     runMsg,
+    h('button', { class: 'secondary wide', type: 'button', onclick: () => show('before') }, 'Before class'),
     h('button', { class: 'secondary wide', type: 'button', onclick: () => show('analysis') }, 'Stats and fun facts'),
     stats,
     h('h2', null, 'Routine'),
@@ -1127,6 +1129,35 @@ async function cancel(tab, id) {
   }
   refresh();
 }
+
+views.before = (root) => {
+  const out = h('div');
+  root.append(h('h1', null, 'Before class'), out);
+  return () => {
+    const cells = toCells(state.notes);
+    const sessions = lastSessions(cells, 3);
+    if (!sessions.length) return fill(out, h('p', { class: 'meta' }, 'No notes loaded yet.'));
+    const review = reviewTopic(cells, state.topics, sessions, todayISO());
+    fill(out,
+      h('h2', null, 'Last sessions'),
+      sessions.map((s) =>
+        h('div', { class: 'card' },
+          h('strong', null, `${s.date}${s.location ? ` · ${s.location}` : ''}`),
+          s.tips.map((t) => h('p', null, t))
+        )
+      ),
+      h('h2', null, 'Worth a look'),
+      review
+        ? h('div', { class: 'card' },
+            h('strong', null, review.topic),
+            h('div', { class: 'meta' }, `Last in your notes: ${review.last}`),
+            review.summary ? h('p', null, review.summary) : null,
+            review.tips.map((c) => h('p', null, `${c.date}: ${c.text}`))
+          )
+        : h('p', { class: 'meta' }, 'No older topic to suggest yet.')
+    );
+  };
+};
 
 views.analysis = (root) => {
   const out = h('div');

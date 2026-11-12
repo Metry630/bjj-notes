@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.0 (2026-11-12)
+
+- New "Before class" screen (button on Home): your last 3 sessions plus one older topic to review. The topic changes daily.
+
 ## 0.9.2 (2026-11-12)
 
 - Usability pass, part 2: Search opens with the keyboard ready, and the Log screen remembers if you left "Type instead" open. One tap less each time.

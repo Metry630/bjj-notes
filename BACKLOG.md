@@ -46,8 +46,8 @@ His requests (from `App · Feedback`) always go above your own items.
 
 ## Later
 
-- [ ] "Before class" screen: his last 3 sessions plus one older topic to review. He said yes (11 Nov).
-      Build next, after the usability review.
+- [x] "Before class" screen: his last 3 sessions plus one older topic to review. He said yes (11 Nov).
+      Shipped 0.10.0, opens from a button on Home.
 - [ ] Monthly hours and sessions on Home.
 
 ## Done
