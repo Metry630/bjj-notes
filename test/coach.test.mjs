@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ladder, spike, vdot, predict, trainingPaces, parseDistance, parseTime, clock, planWeek } from '../tools/coach.mjs';
+import { ladder, spike, vdot, predict, trainingPaces, parseDistance, parseTime, clock, planWeek, vdotFromTempo, paceAt } from '../tools/coach.mjs';
 import { assembleImages, coachContext, isoFromSheet } from '../tools/sheet.mjs';
 import { imageBatches, fitWithin } from '../src/images.js';
 import { weekOf, daysBetween, addDays, sessionDays, ladderState, paceText, profileMap, dayLabel, runTypes, sessionPaces, paceSummary } from '../src/training.js';
@@ -48,6 +48,12 @@ test('VDOT matches Daniels table values', () => {
   near(p50.interval, parseTime('3:55'), 3);
   const p40 = trainingPaces(40).per_km;
   near(p40.threshold, parseTime('5:06'), 3);
+});
+
+test('VDOT from a tempo pace: the inverse of the threshold pace', () => {
+  assert.ok(Math.abs(vdotFromTempo(parseTime('4:15')) - 50) < 0.3);
+  assert.ok(Math.abs(vdotFromTempo(parseTime('5:06')) - 40) < 0.3);
+  for (const v of [24, 33, 47]) assert.ok(Math.abs(paceAt(vdotFromTempo(paceAt(v, 0.88)), 0.88) - paceAt(v, 0.88)) < 0.5);
 });
 
 test('distance, time and clock parsing', () => {

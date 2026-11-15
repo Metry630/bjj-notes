@@ -6,6 +6,8 @@
 //                                                    run in the 30 days before it? (reads App · Runs)
 //   node tools/coach.mjs paces <distance> <time>     VDOT, race predictions and training paces from a
 //                                                    result: paces 5k 33:00, paces 10k 1:05:00
+//   node tools/coach.mjs tempo <pace>                the same, from a hard tempo held 20-40 min (taken
+//                                                    as threshold pace): tempo 7:13
 //   node tools/coach.mjs week [YYYY-MM-DD]           which plan week and day that is (reads App · Plan)
 //
 // Dates default to today in Singapore.
@@ -66,6 +68,19 @@ export function predict(vd, meters) {
 // Seconds per km at a share of VDOT: easy 62-70%, threshold 88%, interval 97.5% (these reproduce
 // Daniels' table paces, e.g. VDOT 50: T 4:15/km, I 3:55/km).
 export const paceAt = (vd, share) => 60000 / velocity(vd * share);
+
+// The VDOT whose threshold pace (88%) is `secPerKm`. A hard 20-40 minute tempo stands in for a race
+// when there is no recent one, and it is run in his own heat, so the paces it gives fit his weather.
+export function vdotFromTempo(secPerKm) {
+  let lo = 10;
+  let hi = 85;
+  for (let i = 0; i < 80; i++) {
+    const mid = (lo + hi) / 2;
+    if (paceAt(mid, 0.88) > secPerKm) lo = mid; // still slower than his tempo: VDOT is higher
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
 
 export function trainingPaces(vd) {
   const hm = predict(vd, 21097.5);
@@ -128,8 +143,10 @@ function main(argv) {
     }
     case 'spike':
       return print(spike(Number(rest[0]), call('get', { tab: 'App · Runs' }).rows, rest[1] || sgToday()));
-    case 'paces': {
-      const p = trainingPaces(vdot(parseDistance(rest[0]), parseTime(rest[1])));
+    case 'paces':
+    case 'tempo': {
+      const vd = cmd === 'tempo' ? vdotFromTempo(parseTime(rest[0])) : vdot(parseDistance(rest[0]), parseTime(rest[1]));
+      const p = trainingPaces(vd);
       const k = (sec) => `${clock(sec)}/km`;
       return print({
         vdot: p.vdot,

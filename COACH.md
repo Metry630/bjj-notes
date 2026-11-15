@@ -66,6 +66,22 @@ came back, means repeating the week.
 - With no run at all in the last 30 days, restart from the longest recent run, not from where the
   ladder was.
 
+**The weekly shape.** One hard running day per weekend, because two BJJ nights a week are hard
+already and most running should be easy.
+- Speed weekend: Saturday is fast km or tempo, Sunday's long run is fully easy.
+- Race-pace weekend: Saturday is rest or an easy 3 km, and Sunday's long run carries race-pace
+  blocks with 1 km easy between. They start once the long run is about 10 km. Race-pace km in one
+  long run stay at 8 or fewer, and the last long run before the taper finishes with them instead.
+- Friday: easy with 4 strides, and optional on speed weekends when his legs are heavy (never made
+  up).
+- Cutback weeks, time-trial weeks and the taper break the pattern on purpose.
+
+**Progress one thing at a time.** Every quality session is a step up from the previous one of the
+same type: more reps, then a longer block, then a faster pace, but only one of those in a week. Don't put the same
+quality session on two back-to-back quality weekends unless it's a planned retest (say so in the
+week note). Long-run distance and race-pace km never both go up in the same week. Fast km tops out
+at 4 reps at his weekly volume; tempo is the main lever for a half.
+
 **Sessions are written in whole km**, so Strava's automatic km splits show every part. A phone
 can't split an 800 m rep or a timed jog, so don't prescribe those.
 - Fast km: pairs of one easy km then one fast km, repeated as written, then a 5-minute walk.
@@ -75,7 +91,9 @@ can't split an 800 m rep or a timed jog, so don't prescribe those.
 
 Each plan day has a type in `fri_type`, `sat_type` and `sun_type`. These are keys of the profile's
 `run_types` (easy, long, tempo, fast, race, strides, tt, rest, raceday), with several joined by
-commas. The app shows that type's pace, feel and how-to under the session. Paces live only in
+commas. The app shows each type's pace, the first type's feel, and the how-to under the session.
+So put the type that sets the effort first: `race,long` for a long run with race-pace blocks, and
+`easy` for "rest or easy 3 km". Paces live only in
 `run_types`, so when they change, update them there and not in the session texts.
 
 **Cutback weeks** (every 4th) stay lighter even if he feels great.
@@ -90,7 +108,12 @@ not pace: in heat and humidity the same effort is slower.
 Friday. Never a bigger long-run jump.
 
 **Paces.** After each time trial or race, run `node tools/coach.mjs paces <distance> <time>` (Daniels
-VDOT). Update the paces in `run_types`, and say what changed and why.
+VDOT). With no recent race, a hard tempo works: `node tools/coach.mjs tempo <pace>`. Update the
+paces in `run_types`, and say what changed and why.
+- When one target pace proves wrong (he can't hold it at the intended effort, or it feels easy),
+  recalibrate all the paces together from that same evidence, not just the one.
+- Calibrate from his own runs in local heat and humidity. A short all-out effort (2 km or less)
+  overstates longer paces, so don't use it alone.
 
 **Fuel and water (for answers).**
 - Carbs during exercise: 30-60 g/hour for efforts of 1-2.5 hours (Burke et al. 2011 consensus),
