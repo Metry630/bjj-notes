@@ -5,6 +5,13 @@ His requests (from `App · Feedback`) always go above your own items.
 
 ## Up next
 
+- [ ] **Multi-activity revamp** (he asked, 19 Nov). Reading chosen: add Lifting, Dance (bachata cues) and
+      Philosophy (meetup concepts) next to BJJ and Run, bottom bar of at most six tabs, every log list
+      collapsible so many entries do not stack. Needs new App tabs and a Code.gs redeploy (decision
+      `dec-multi-activity` open). Parts: (1) nav with six tabs and a reusable collapsible log
+      component; (2) Lifting: squat, deadlift, chin ups, pull ups, quick log, history, next-session
+      suggestion; (3) Dance: cues per move, reminder view; (4) Philosophy: concepts per meetup, with
+      added context; (5) Code.gs bundle. Build parts 1 and 2 in the web app first.
 - [x] **Usability review** (he asked, 11 Nov). Reading chosen: count taps to each screen and remove the
       slowest. Part 1 shipped 0.9.1: Home in the bottom bar (was 2 taps), Stats from a button on Home.
       Part 2 shipped 0.9.2: Search focuses its box, Log remembers "Type instead". Review done.
