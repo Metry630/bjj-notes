@@ -525,7 +525,7 @@ function phoneRow_(tab, input) {
   return row;
 }
 
-const LIFTS = ['Squat', 'Deadlift', 'Chin ups', 'Pull ups'];
+const LIFTS = ['Squat', 'Deadlift', 'Bench press', 'Chin ups', 'Pull ups'];
 function checkLifting_(row) {
   if (LIFTS.indexOf(row.exercise) < 0) throw new Error('bad_exercise');
   isoDate_(row.date);

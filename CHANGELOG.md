@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.1 (2026-11-21)
+
+- Lift tab: bench press added, and the exercise dropdown is now full width and taller so it is easier to tap. Bench press also needs the updated Code.gs pasted (same paste as the Lift tab).
+
 ## 0.11.0 (2026-11-20)
 
 - New Lift tab (six tabs in the bottom bar): quick log for squat, deadlift, chin ups and pull ups, a next-session suggestion, and history grouped by day in collapsible sections. Needs the updated Code.gs pasted once to save lifts.

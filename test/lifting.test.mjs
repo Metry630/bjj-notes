@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { groupByDate, suggestNext, validEntry, summary } from '../src/lifting.js';
+import { EXERCISES, groupByDate, suggestNext, validEntry, summary } from '../src/lifting.js';
 import { loadCodeGs } from './fake-gas.mjs';
 
 const rows = [
@@ -44,4 +44,9 @@ test('Code.gs: phone can add a lift, bad ones are refused', () => {
   assert.equal(add({ ...ok, date: 'x' }).error, 'bad_date');
   assert.equal(add({ ...ok, reps: 0 }).error, 'bad_reps');
   assert.equal(add({ ...ok, weight_kg: 900 }).error, 'bad_weight');
+});
+
+test('bench press is a lift choice', () => {
+  assert.ok(EXERCISES.some((e) => e.name === 'Bench press'));
+  assert.equal(validEntry({ exercise: 'Bench press', weight_kg: '40', sets: '3', reps: '8' }), '');
 });

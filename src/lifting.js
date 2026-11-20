@@ -2,6 +2,7 @@
 export const EXERCISES = [
   { name: 'Squat', step: 5, bodyweight: false },
   { name: 'Deadlift', step: 5, bodyweight: false },
+  { name: 'Bench press', step: 2.5, bodyweight: false },
   { name: 'Chin ups', step: 0, bodyweight: true },
   { name: 'Pull ups', step: 0, bodyweight: true },
 ];

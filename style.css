@@ -50,7 +50,7 @@ p { margin: 6px 0; }
 
 form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 label { display: grid; gap: 4px; font-size: 0.8rem; color: var(--muted); }
-input, textarea {
+input, textarea, select {
   width: 100%;
   font: inherit;
   color: var(--text);
@@ -60,6 +60,7 @@ input, textarea {
   padding: 10px 12px;
 }
 input { min-height: 44px; }
+select { min-height: 52px; font-size: 1rem; }
 textarea { resize: vertical; min-height: 7em; }
 input[type="search"] { margin-bottom: 8px; }
 .row3 { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.3fr) minmax(0, 0.8fr); gap: 8px; }

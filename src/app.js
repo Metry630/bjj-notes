@@ -12,7 +12,7 @@ import { attachPull } from './pull.js';
 import { navItems } from './nav.js';
 import { EXERCISES, groupByDate, summary as liftSummary, suggestNext, validEntry } from './lifting.js';
 
-export const VERSION = '0.11.0';
+export const VERSION = '0.11.1';
 
 const TABS = {
   inbox: 'App · Inbox',
