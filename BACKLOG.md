@@ -5,6 +5,8 @@ His requests (from `App · Feedback`) always go above your own items.
 
 ## Up next
 
+- [ ] **Lift tab fixes** (he asked, 20 Nov). Add bench press to the lift choices, and fix the lift dropdown
+      so it is not too wide and too short (size it to fit its content and make it taller/easier to tap).
 - [ ] **Multi-activity revamp** (he asked, 19 Nov). Reading chosen: add Lifting, Dance (bachata cues) and
       Philosophy (meetup concepts) next to BJJ and Run, bottom bar of at most six tabs, every log list
       collapsible so many entries do not stack. Needs new App tabs and a Code.gs redeploy (decision
