@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.0 (2026-11-20)
+
+- New Lift tab (six tabs in the bottom bar): quick log for squat, deadlift, chin ups and pull ups, a next-session suggestion, and history grouped by day in collapsible sections. Needs the updated Code.gs pasted once to save lifts.
+
 ## 0.10.1 (2026-11-13)
 
 - Home shows hours and sessions for this month and last month.

@@ -1,5 +1,5 @@
-// Bottom bar: every everyday screen is one tap away. Stats opens from a button on Home.
-export const MAIN = [['log', 'Log'], ['search', 'Search'], ['ask', 'Ask'], ['run', 'Run'], ['home', 'Home']];
+// Bottom bar: every everyday screen is one tap away (six at most). Stats opens from a button on Home.
+export const MAIN = [['log', 'Log'], ['search', 'Search'], ['ask', 'Ask'], ['run', 'Run'], ['lift', 'Lift'], ['home', 'Home']];
 
 export function navItems(view, badges = {}) {
   // Stats is a child of Home, so Home stays lit while it is open.

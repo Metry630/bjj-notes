@@ -107,7 +107,7 @@ details summary { color: var(--muted); font-size: 0.9rem; margin: 12px 0 4px; cu
 .nav[hidden] { display: none; }
 .nav button {
   min-height: 56px; background: none; border: 0; border-radius: 0;
-  color: var(--muted); font-size: 0.95rem; font-weight: 600; position: relative;
+  color: var(--muted); font-size: 0.85rem; font-weight: 600; position: relative;
 }
 .nav button.on { color: var(--accent); }
 .badge {
@@ -185,3 +185,7 @@ details.type summary { color: var(--accent); font-weight: 600; margin: 8px 0; cu
 .pull { height: 0; overflow: hidden; text-align: center; font-size: 0.8rem; color: var(--muted); line-height: 28px; }
 .status.syncing::before { content: ""; display: inline-block; width: 0.7em; height: 0.7em; margin-right: 6px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: -1px; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+details.fold { margin: 6px 0; }
+details.fold summary { color: var(--text); font-weight: 600; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

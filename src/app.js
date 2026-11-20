@@ -10,8 +10,9 @@ import { weekOf, sessionDays, profileMap, ladderState, daysBetween, dayLabel, ru
 import { todayISO, draftDate, isoToSheetDate, nextRunLabel, hoursSince, shortTime } from './dates.js';
 import { attachPull } from './pull.js';
 import { navItems } from './nav.js';
+import { EXERCISES, groupByDate, summary as liftSummary, suggestNext, validEntry } from './lifting.js';
 
-export const VERSION = '0.10.1';
+export const VERSION = '0.11.0';
 
 const TABS = {
   inbox: 'App · Inbox',
@@ -26,6 +27,7 @@ const TABS = {
   runs: 'App · Runs',
   plan: 'App · Plan',
   profile: 'App · Profile',
+  lifting: 'App · Lifting',
 };
 const ERRORS = {
   offline: 'No connection.',
@@ -57,6 +59,7 @@ const state = {
   feedback: store.get('feedback', []),
   log: store.get('log', []),
   topics: store.get('topics', []),
+  lifting: store.get('lifting', []),
   decisions: store.get('decisions', []),
   coach: store.get('coach', []),
   runs: store.get('runs', []),
@@ -925,6 +928,73 @@ views.run = (root) => {
   };
 };
 
+// A log list section that opens and closes; the choice is remembered per key on this phone.
+function fold(key, title, kids, openByDefault = false) {
+  const open = store.get(`fold:${key}`, openByDefault);
+  return h('details', { class: 'fold', open: open ? true : null, ontoggle: (e) => store.set(`fold:${key}`, e.target.open) }, h('summary', null, title), kids);
+}
+
+// ---- Lift: quick log for squat, deadlift, chin ups, pull ups; history by day; next-session hint ----
+
+views.lift = (root) => {
+  const exercise = h('select', null, EXERCISES.map((e) => h('option', { value: e.name }, e.name)));
+  const weight = h('input', { type: 'number', inputmode: 'decimal', min: '0', max: '500', step: '0.5', placeholder: 'kg (0 for bodyweight)' });
+  const sets = h('input', { type: 'number', inputmode: 'numeric', min: '1', max: '20', placeholder: 'Sets' });
+  const reps = h('input', { type: 'number', inputmode: 'numeric', min: '1', max: '100', placeholder: 'Reps' });
+  const date = h('input', { type: 'date', value: todayISO() });
+  const note = h('input', { type: 'text', placeholder: 'Note (optional)' });
+  const hint = h('p', { class: 'meta' });
+  const msg = h('p', { class: 'msg', role: 'status' });
+  const list = h('div');
+  const save = h('button', { class: 'primary', type: 'submit' }, 'Save');
+  const useHint = () => {
+    const s = suggestNext(state.lifting, exercise.value);
+    fill(hint, s ? [s.why, ' ', h('button', { class: 'link', type: 'button', onclick: () => { weight.value = s.weight_kg; sets.value = s.sets; reps.value = s.reps; } }, `Use ${s.weight_kg ? `${s.weight_kg} kg ` : ''}${s.sets} x ${s.reps}`)] : 'No history for this one yet.');
+  };
+  exercise.addEventListener('change', useHint);
+  const form = h(
+    'form',
+    {
+      onsubmit: async (ev) => {
+        ev.preventDefault();
+        const entry = { exercise: exercise.value, weight_kg: weight.value, sets: sets.value, reps: reps.value };
+        const bad = validEntry(entry);
+        if (bad) return void (msg.textContent = bad);
+        save.disabled = true;
+        try {
+          await api.call('add', { tab: TABS.lifting, rows: [{ id: uid(), date: date.value, ...entry, weight_kg: weight.value || '0', note: note.value.trim() }] });
+          msg.textContent = 'Saved.';
+          weight.value = sets.value = reps.value = note.value = '';
+          refresh();
+        } catch (e) {
+          msg.textContent = errorText(e);
+        } finally {
+          save.disabled = false;
+        }
+      },
+    },
+    h('label', null, 'Exercise', exercise),
+    hint,
+    h('label', null, 'Weight', weight),
+    h('div', { class: 'row2' }, sets, reps),
+    h('label', null, 'Day', date),
+    note,
+    save,
+    msg
+  );
+  root.append(h('h1', null, 'Lift'), form, list);
+
+  return () => {
+    useHint();
+    const days = groupByDate(state.lifting);
+    fill(list, days.length ? h('h2', null, 'History') : '', days.map((g, i) =>
+      fold(`lift:${g.date}`, `${dayLabel(g.date)} (${plural(g.items.length, 'lift')})`,
+        g.items.map((r) => h('div', { class: 'meta' }, liftSummary(r), r.note ? ` · ${r.note}` : '', ' ', h('button', { class: 'link', type: 'button', onclick: () => cancel(TABS.lifting, r.id) }, 'Remove'))),
+        i === 0)
+    ));
+  };
+};
+
 views.home = (root) => {
   const modes = h('div', { class: 'modes' });
   const fbText = h('textarea', { rows: '3', placeholder: 'Feedback for Claude: what to change, what is annoying, what you want next.' });
@@ -1267,7 +1337,7 @@ async function refresh() {
       store.set('queue', state.queue);
       if (res.error && res.error.message !== 'offline') setStatus(errorText(res.error));
     }
-    const keys = ['notes', 'inbox', 'questions', 'feedback', 'log', 'topics', 'settings', 'decisions', 'coach', 'runs', 'plan', 'profile'];
+    const keys = ['notes', 'inbox', 'questions', 'feedback', 'log', 'topics', 'settings', 'decisions', 'coach', 'runs', 'plan', 'profile', 'lifting'];
     const results = await api.batch([
       { action: 'notes' },
       { action: 'get', tab: TABS.inbox },
@@ -1281,6 +1351,7 @@ async function refresh() {
       { action: 'get', tab: TABS.runs },
       { action: 'get', tab: TABS.plan },
       { action: 'get', tab: TABS.profile },
+      { action: 'get', tab: TABS.lifting },
     ]);
     results.forEach((r, i) => {
       if (!r.ok) return;
