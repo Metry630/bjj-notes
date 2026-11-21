@@ -5,9 +5,13 @@ His requests (from `App · Feedback`) always go above your own items.
 
 ## Up next
 
+- [x] **Whole-week rework: IN PROGRESS in a laptop session with him (21 Nov).** Do not start feature work on
+      `src/`, `style.css`, `apps-script/` or the docs until this line is replaced by the rework's own items.
+      Chores (recordings, inbox, questions, coach, feedback, decisions) go on as normal. It supersedes the
+      multi-activity revamp below: six tabs (Today, BJJ, Run, Lift, Dance, Think), Code.gs v5 in one paste.
 - [x] **Lift tab fixes** (he asked, 20 Nov). Add bench press to the lift choices, and fix the lift dropdown
       so it is not too wide and too short (size it to fit its content and make it taller/easier to tap).
-- [ ] **Multi-activity revamp** (he asked, 19 Nov). Reading chosen: add Lifting, Dance (bachata cues) and
+- [x] **Multi-activity revamp** (he asked, 19 Nov). Superseded 21 Nov by the whole-week rework above. Reading chosen: add Lifting, Dance (bachata cues) and
       Philosophy (meetup concepts) next to BJJ and Run, bottom bar of at most six tabs, every log list
       collapsible so many entries do not stack. Needs new App tabs and a Code.gs redeploy (decision
       `dec-multi-activity` open). Parts: (1) nav with six tabs and a reusable collapsible log
