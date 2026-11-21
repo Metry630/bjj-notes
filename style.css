@@ -190,3 +190,6 @@ details.type summary { color: var(--accent); font-weight: 600; margin: 8px 0; cu
 details.fold { margin: 6px 0; }
 details.fold summary { color: var(--text); font-weight: 600; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.modes.switch { grid-template-columns: 1fr 1fr; margin-bottom: 8px; }
+.modes.switch .mode { text-align: center; }

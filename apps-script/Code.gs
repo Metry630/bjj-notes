@@ -36,6 +36,7 @@ const TABS = {
   'App · Coach': ['id', 'created_at', 'kind', 'run_date', 'text', 'feel', 'pain', 'images', 'status', 'reply', 'replied_at'],
   'App · Images': ['id', 'created_at', 'coach_id', 'part', 'seq', 'total', 'mime', 'data', 'status'],
   'App · Lifting': ['id', 'created_at', 'date', 'exercise', 'weight_kg', 'sets', 'reps', 'note', 'status'],
+  'App · Dance': ['id', 'created_at', 'move', 'cue', 'status'],
 };
 TABS['App · Inbox'] = TABS['App · Inbox'].concat(['method', 'rating']);
 // What the phone may set on its own rows; everything else is server- or agent-set.
@@ -47,6 +48,7 @@ const PHONE_FIELDS = {
   'App · Coach': ['kind', 'run_date', 'text', 'feel', 'pain', 'images'],
   'App · Images': ['coach_id', 'part', 'seq', 'total', 'mime', 'data'],
   'App · Lifting': ['date', 'exercise', 'weight_kg', 'sets', 'reps', 'note'],
+  'App · Dance': ['move', 'cue'],
 };
 // Fields the phone may change at any time, not only while an item is still "new".
 const PHONE_ANYTIME = { 'App · Inbox': ['rating'], 'App · Coach': ['rating'] };
@@ -57,7 +59,7 @@ const KINDS = ['run', 'ask', 'checkin'];
 const FEELS = ['easy', 'ok', 'hard', 'very hard'];
 const CREATED_FIELD = {
   'App · Inbox': 'created_at', 'App · Questions': 'asked_at', 'App · Feedback': 'created_at', 'App · Audio': 'created_at',
-  'App · Coach': 'created_at', 'App · Images': 'created_at', 'App · Lifting': 'created_at',
+  'App · Coach': 'created_at', 'App · Images': 'created_at', 'App · Lifting': 'created_at', 'App · Dance': 'created_at',
 };
 // Run now: the routine's API trigger. Its token (sk-ant-oat01-...) lives in Script Properties as
 // RUN_TOKEN and can only start this one routine.
@@ -521,6 +523,7 @@ function phoneRow_(tab, input) {
   if (tab === 'App · Coach') checkCoach_(row);
   if (tab === 'App · Images') checkImage_(row);
   if (tab === 'App · Lifting') checkLifting_(row);
+  if (tab === 'App · Dance') checkDance_(row);
   row.status = 'new';
   return row;
 }
@@ -534,6 +537,13 @@ function checkLifting_(row) {
   if (!(Number(row.sets) >= 1 && Number(row.sets) <= 20)) throw new Error('bad_sets');
   if (!(Number(row.reps) >= 1 && Number(row.reps) <= 100)) throw new Error('bad_reps');
   if (row.note != null && String(row.note).length > 200) throw new Error('bad_note');
+}
+
+function checkDance_(row) {
+  const move = String(row.move == null ? '' : row.move).trim();
+  const cue = String(row.cue == null ? '' : row.cue).trim();
+  if (!move || move.length > 60) throw new Error('bad_move');
+  if (!cue || cue.length > 300) throw new Error('bad_cue');
 }
 
 function checkCoach_(row) {

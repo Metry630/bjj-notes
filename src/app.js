@@ -10,9 +10,10 @@ import { weekOf, sessionDays, profileMap, ladderState, daysBetween, dayLabel, ru
 import { todayISO, draftDate, isoToSheetDate, nextRunLabel, hoursSince, shortTime } from './dates.js';
 import { attachPull } from './pull.js';
 import { navItems } from './nav.js';
+import { groupByMove, reminder, validCue } from './dance.js';
 import { EXERCISES, groupByDate, summary as liftSummary, suggestNext, validEntry } from './lifting.js';
 
-export const VERSION = '0.11.1';
+export const VERSION = '0.12.0';
 
 const TABS = {
   inbox: 'App · Inbox',
@@ -28,6 +29,7 @@ const TABS = {
   plan: 'App · Plan',
   profile: 'App · Profile',
   lifting: 'App · Lifting',
+  dance: 'App · Dance',
 };
 const ERRORS = {
   offline: 'No connection.',
@@ -60,6 +62,7 @@ const state = {
   log: store.get('log', []),
   topics: store.get('topics', []),
   lifting: store.get('lifting', []),
+  dance: store.get('dance', []),
   decisions: store.get('decisions', []),
   coach: store.get('coach', []),
   runs: store.get('runs', []),
@@ -982,7 +985,7 @@ views.lift = (root) => {
     save,
     msg
   );
-  root.append(h('h1', null, 'Lift'), form, list);
+  root.append(switcher('lift'), h('h1', null, 'Lift'), form, list);
 
   return () => {
     useHint();
@@ -991,6 +994,75 @@ views.lift = (root) => {
       fold(`lift:${g.date}`, `${dayLabel(g.date)} (${plural(g.items.length, 'lift')})`,
         g.items.map((r) => h('div', { class: 'meta' }, liftSummary(r), r.note ? ` · ${r.note}` : '', ' ', h('button', { class: 'link', type: 'button', onclick: () => cancel(TABS.lifting, r.id) }, 'Remove'))),
         i === 0)
+    ));
+  };
+};
+
+// Lift and Dance share one bottom-bar tab (the bar stays at six); this switcher sits on top of both.
+function switcher(current) {
+  return h('div', { class: 'modes switch' }, [['lift', 'Lift'], ['dance', 'Dance']].map(([v, label]) =>
+    h('button', { class: v === current ? 'mode on' : 'mode', type: 'button', onclick: () => v !== current && show(v) }, label)));
+}
+
+// ---- Dance: cues per move, and a reminder to look over before class ----
+
+views.dance = (root) => {
+  const move = h('input', { type: 'text', maxlength: '60', placeholder: 'Move (e.g. basic step, turn)', list: 'dance-moves', autocomplete: 'off' });
+  const moves = h('datalist', { id: 'dance-moves' });
+  const cue = h('textarea', { rows: '2', maxlength: '300', placeholder: 'Cue: what to remember for this move' });
+  const msg = h('p', { class: 'msg', role: 'status' });
+  const remind = h('div');
+  const list = h('div');
+  const save = h('button', { class: 'primary', type: 'submit' }, 'Save cue');
+  let last = '';
+  const showReminder = () => {
+    const m = reminder(state.dance, Math.random(), last);
+    if (m) last = m.move;
+    fill(remind, m
+      ? h('div', { class: 'card' }, h('strong', null, m.move), m.items.map((r) => h('div', { class: 'meta' }, r.cue)))
+      : h('p', { class: 'meta' }, 'No cues yet. Add the first one below.'));
+  };
+  const form = h(
+    'form',
+    {
+      onsubmit: async (ev) => {
+        ev.preventDefault();
+        const entry = { move: move.value.trim(), cue: cue.value.trim() };
+        const bad = validCue(entry);
+        if (bad) return void (msg.textContent = bad);
+        save.disabled = true;
+        try {
+          await api.call('add', { tab: TABS.dance, rows: [{ id: uid(), ...entry }] });
+          msg.textContent = 'Saved.';
+          cue.value = '';
+          refresh();
+        } catch (e) {
+          msg.textContent = errorText(e);
+        } finally {
+          save.disabled = false;
+        }
+      },
+    },
+    h('label', null, 'Move', move, moves),
+    cue,
+    save,
+    msg
+  );
+  root.append(
+    switcher('dance'),
+    h('h1', null, 'Dance'),
+    h('button', { class: 'secondary wide', type: 'button', onclick: showReminder }, 'Remind me of a move'),
+    remind,
+    form,
+    list
+  );
+
+  return () => {
+    const groups = groupByMove(state.dance);
+    fill(moves, groups.map((g) => h('option', { value: g.move })));
+    fill(list, groups.length ? h('h2', null, 'Moves') : '', groups.map((g) =>
+      fold(`dance:${g.move.toLowerCase()}`, `${g.move} (${plural(g.items.length, 'cue')})`,
+        g.items.map((r) => h('div', { class: 'meta' }, r.cue, ' ', h('button', { class: 'link', type: 'button', onclick: () => cancel(TABS.dance, r.id) }, 'Remove'))))
     ));
   };
 };
@@ -1337,7 +1409,7 @@ async function refresh() {
       store.set('queue', state.queue);
       if (res.error && res.error.message !== 'offline') setStatus(errorText(res.error));
     }
-    const keys = ['notes', 'inbox', 'questions', 'feedback', 'log', 'topics', 'settings', 'decisions', 'coach', 'runs', 'plan', 'profile', 'lifting'];
+    const keys = ['notes', 'inbox', 'questions', 'feedback', 'log', 'topics', 'settings', 'decisions', 'coach', 'runs', 'plan', 'profile', 'lifting', 'dance'];
     const results = await api.batch([
       { action: 'notes' },
       { action: 'get', tab: TABS.inbox },
@@ -1352,6 +1424,7 @@ async function refresh() {
       { action: 'get', tab: TABS.plan },
       { action: 'get', tab: TABS.profile },
       { action: 'get', tab: TABS.lifting },
+      { action: 'get', tab: TABS.dance },
     ]);
     results.forEach((r, i) => {
       if (!r.ok) return;

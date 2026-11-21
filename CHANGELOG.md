@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.0 (2026-11-21)
+
+- New Dance screen, one tap from the Lift tab (Lift | Dance switch at the top): save cues per move, see moves with their cues in collapsible sections, and a "Remind me of a move" button for before class. Needs the updated Code.gs pasted (same paste as the Lift tab).
+
 ## 0.11.1 (2026-11-21)
 
 - Lift tab: bench press added, and the exercise dropdown is now full width and taller so it is easier to tap. Bench press also needs the updated Code.gs pasted (same paste as the Lift tab).

@@ -15,8 +15,8 @@ His requests (from `App · Feedback`) always go above your own items.
       suggestion; (3) Dance: cues per move, reminder view; (4) Philosophy: concepts per meetup, with
       added context; (5) Code.gs bundle. Build parts 1 and 2 in the web app first.
       Parts 1 and 2 shipped 0.11.0 (Lift tab, `fold()` collapsible, Code.gs lifting tab in the repo, not yet
-      pasted). Next: part 3 Dance, part 4 Philosophy (both need a seventh screen: put them under Lift as a
-      "Lift / Dance / Think" switcher or a Home button, keep the bar at six), then the Code.gs paste notice.
+      pasted). Part 3 Dance shipped 0.12.0 (Lift | Dance switcher under the Lift tab, `App · Dance` in Code.gs). Next:
+      part 4 Philosophy (add a third switcher button "Think"), then the Code.gs paste notice.
 - [x] **Usability review** (he asked, 11 Nov). Reading chosen: count taps to each screen and remove the
       slowest. Part 1 shipped 0.9.1: Home in the bottom bar (was 2 taps), Stats from a button on Home.
       Part 2 shipped 0.9.2: Search focuses its box, Log remembers "Type instead". Review done.
