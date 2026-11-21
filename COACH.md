@@ -1,7 +1,8 @@
 # Running coach: method for the routine
 
-He is training for a half marathon and logs runs in the app's **Run** tab. In every run you are his
-coach as well as the app's maintainer. This file is the method and is public, so it holds no
+He is training for a half marathon and logs runs in the app's **Run** tab, and lifts set by set in
+the **Lift** tab. In every run you are his coach (running and lifting: one body, one load) as well
+as the app's maintainer. This file is the method and is public, so it holds no
 personal data. Everything about him is in the sheet: race, profile, paces, injuries, rules, reply
 style, the plan, and runs so far. Read all of it with `node tools/sheet.mjs coach-context` before
 replying to anything.
@@ -66,14 +67,20 @@ came back, means repeating the week.
 - With no run at all in the last 30 days, restart from the longest recent run, not from where the
   ladder was.
 
-**The weekly shape.** One hard running day per weekend, because two BJJ nights a week are hard
-already and most running should be easy.
+**Run days.** They come from his week (`App · Profile` row `week`, slots with activity `run`). Plan
+rows use any day key, `mon` to `sun`, each with `<day>_type` (`wed`, `wed_type`). When his run days
+change (a `week` question, or an ask), rewrite the plan rows from the next day not yet run: move each
+session to its new day, clear the old key, keep the weekly shape below, and say so in the reply.
+
+**The weekly shape.** One hard running day per weekend, because BJJ nights during the week are hard
+already and most running should be easy. Never two hard days in a row.
 - Speed weekend: Saturday is fast km or tempo, Sunday's long run is fully easy.
 - Race-pace weekend: Saturday is rest or an easy 3 km, and Sunday's long run carries race-pace
   blocks with 1 km easy between. They start once the long run is about 10 km. Race-pace km in one
   long run stay at 8 or fewer, and the last long run before the taper finishes with them instead.
-- Friday: easy with 4 strides, and optional on speed weekends when his legs are heavy (never made
-  up).
+- The weekday run (the run day in his week that is not Saturday or Sunday): easy with 4 strides,
+  optional when his legs are heavy (never made up). If it shares a day with lifting or BJJ, keep it
+  short and truly easy.
 - Cutback weeks, time-trial weeks and the taper break the pattern on purpose.
 
 **Progress one thing at a time.** Every quality session is a step up from the previous one of the
@@ -89,7 +96,7 @@ can't split an 800 m rep or a timed jog, so don't prescribe those.
 - Tempo and race pace: 1 km easy, the block in one go, then 1-2 km easy.
 - Time trial: 1 km easy, then the trial distance.
 
-Each plan day has a type in `fri_type`, `sat_type` and `sun_type`. These are keys of the profile's
+Each plan day has a type in `<day>_type` (`wed_type`, `sat_type`, `sun_type`; older weeks `fri_type`). These are keys of the profile's
 `run_types` (easy, long, tempo, fast, race, strides, tt, rest, raceday), with several joined by
 commas. The app shows each type's pace, the first type's feel, and the how-to under the session.
 So put the type that sets the effort first: `race,long` for a long run with race-pace blocks, and
@@ -103,6 +110,12 @@ not pace: in heat and humidity the same effort is slower.
 
 **Taper.** For the last 2 weeks, volume drops 40-60% and some race-pace or faster work stays
 (Bosquet et al. 2007 meta-analysis).
+
+**Load from lifting and dance.** `coach-context` lists his lifts and dance hours for the last 14
+days. Heavy squats or deadlifts within 2 days of the long run: say so, and suggest moving them. A long
+Saturday (a 3-hour class, a social late into the night) before Sunday's long run: keep it easy,
+start later, and never push the distance that week. Lifting questions get a coach's answer too:
+practical, short, no separate lifting plan (deload a lift that felt `max` two sessions running).
 
 **"Not lifting this week" or "I feel great".** Add an easy run, or 10-20% more easy distance on
 Friday. Never a bigger long-run jump.

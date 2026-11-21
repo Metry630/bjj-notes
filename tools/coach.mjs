@@ -128,7 +128,8 @@ export function planWeek(plan, iso) {
   const w = plan.find((r) => r.start && r.start <= iso && iso < addDays(r.start, 7));
   if (!w) return null;
   const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(`${iso}T00:00:00Z`).getUTCDay()];
-  return { week: w.week, block: w.block, day, session: { Fri: w.fri, Sat: w.sat, Sun: w.sun }[day] || 'rest or BJJ' };
+  // Any weekday can hold a run (wed, sat, sun from Nov 2026; fri, sat, sun before).
+  return { week: w.week, block: w.block, day, session: w[day.toLowerCase()] || 'rest or BJJ' };
 }
 
 const sgToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Singapore' }).format(new Date());

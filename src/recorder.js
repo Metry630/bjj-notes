@@ -33,14 +33,21 @@ export function blobToBase64(blob) {
   });
 }
 
-// 32 kbps is plenty for speech and keeps a 5-minute note around 1.2 MB.
-export async function startRecording() {
+// 32 kbps is plenty for speech and keeps a 5-minute note around 1.2 MB. `onChunk` gets every
+// second of audio as it arrives, so it can be written to the phone's database straight away.
+export async function startRecording({ onChunk } = {}) {
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   const wanted = pickMime();
   const rec = new MediaRecorder(stream, { ...(wanted ? { mimeType: wanted } : {}), audioBitsPerSecond: 32000 });
   const chunks = [];
   rec.ondataavailable = (e) => {
-    if (e.data && e.data.size) chunks.push(e.data);
+    if (!e.data || !e.data.size) return;
+    chunks.push(e.data);
+    try {
+      onChunk?.(e.data);
+    } catch {
+      // the in-memory copy still has it
+    }
   };
   rec.start(1000);
   const started = Date.now();
@@ -66,6 +73,9 @@ export async function startRecording() {
   return {
     started,
     elapsed,
+    get mime() {
+      return rec.mimeType || wanted || 'audio/mp4';
+    },
     get paused() {
       return !!pausedAt;
     },

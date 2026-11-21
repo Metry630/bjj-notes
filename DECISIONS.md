@@ -76,3 +76,48 @@ check covers those tabs too.
 itself. Only money, new credentials, data rewrites or an Apps Script redeploy become a question,
 always with options and a recommendation, answered with one tap on Home.
 
+## 1.0, the whole-week rework (21 Nov 2026)
+
+**Six tabs, Today first.** Today · BJJ · Run · Lift · Dance · Think (his pick). Today is built from
+his week, so the right action is on the first screen: one tap on a slot starts a recording with
+that slot's activity, style and hours filled in. Every feature had to make him happier, by being
+useful or by making something useful easier to reach; streaks, stars, a People list and push
+reminders failed that test and were left out.
+
+**A voice note can't be lost.** Before 1.0 a recording lived in memory until its upload finished,
+and an unsent one went to localStorage (about 5 MB, silent when full), so a stalled upload plus iOS
+closing the app lost it. Now every second of audio goes to IndexedDB as he talks, whole slices
+upload while he is still talking (the routine takes the smallest `total`, as slices sent before Stop
+carry 500), the Inbox item goes last so the routine never sees half a recording, and the phone
+keeps the audio until the transcript is back. A recording the app was closed in is finished at the
+next start. Tested end to end in Chrome with a fake microphone.
+
+**One outbox for every save.** Notes, sets, marks and coach messages are written to IndexedDB first
+and sent after, oldest first. Network trouble stops a flush (order kept); a refusal marks that
+entry and the rest go on. Nothing is dropped.
+
+**His words are write-once, every change is copied.** Script v5 refuses a routine update that would
+change a filled field holding his input; corrections are hide-and-add. Every change to a filled cell
+is copied to App · History first, the phone can restore what he removed, and `ping` reports the
+script version so the app holds dance and philosophy notes until a script that stores their
+activity is live (an older one would have filed them as BJJ notes).
+
+**One journal for the new activities.** Dance and philosophy tips go to App · Journal (his words,
+one tip per row, fixed ids), and moves and concepts are App · Topics rows with an `activity`. One
+shape means one capture flow, one search, one topic page. Concept research is Claude's text, shown
+apart from his words, with sources found by search or marked as none checked.
+
+**The week lives in the sheet, from his words.** He types or dictates it; the routine turns it into
+JSON in App · Profile. A schedule editor would be more screen for something that changes a few
+times a year.
+
+**Sets are rows.** three triples and a heavy single are four rows, so any mix of weights in a day is
+just more taps of Log set. The suggestion comes from the session's main set (the most repeated set
+of 2+ reps) and how it felt, so a test single does not inflate next week. Estimated 1RM is Epley,
+not shown above 10 reps.
+
+**Colours checked, icons carry identity.** No five hues stay apart in every pairing under
+colour-blind simulation, so each activity has an icon, and the colours (blue, aqua, orange, gold,
+violet) were checked in the pairs that share a day in his week. Text uses darker steps of each hue
+(at least 4.5:1). Charts are hand-built SVG: one series each, thin marks, the numbers in a table
+under every chart.

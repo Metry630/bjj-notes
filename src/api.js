@@ -12,18 +12,29 @@ export function parseLink(hash) {
   return LINK.test(api) && TOKEN.test(k) ? { api, k } : null;
 }
 
-export function makeApi(getConfig, fetchImpl = (...a) => fetch(...a)) {
+// A request that hangs (weak signal) fails after `timeoutMs` instead of waiting forever, so the
+// item stays queued and the next try starts fresh.
+export function makeApi(getConfig, fetchImpl = (...a) => fetch(...a), timeoutMs = 90000) {
   async function call(action, payload = {}) {
     const cfg = getConfig();
     if (!cfg) throw new Error('not_linked');
+    const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : 0;
     let res;
     try {
-      res = await fetchImpl(cfg.api, { method: 'POST', body: JSON.stringify({ ...payload, action, token: cfg.k }) });
+      res = await fetchImpl(cfg.api, { method: 'POST', body: JSON.stringify({ ...payload, action, token: cfg.k }), ...(ctrl ? { signal: ctrl.signal } : {}) });
     } catch {
-      throw new Error('offline');
+      throw new Error(ctrl?.signal.aborted ? 'timeout' : 'offline');
+    } finally {
+      clearTimeout(timer);
     }
     if (!res.ok) throw new Error(`http_${res.status}`);
-    const data = await res.json();
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      throw new Error('not_json'); // Google's error page instead of an answer: worth a retry
+    }
     if (!data.ok) throw new Error(data.error || 'api_error');
     return data;
   }

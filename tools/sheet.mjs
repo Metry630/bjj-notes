@@ -24,7 +24,8 @@
 //
 // Running coach (see COACH.md):
 //   node tools/sheet.mjs coach                          new messages, oldest first
-//   node tools/sheet.mjs coach-context                  profile, plan, recent runs and exchanges, BJJ load
+//   node tools/sheet.mjs coach-context                  profile (incl. his week), plan, recent runs and exchanges,
+//                                                       BJJ, lifting and dance load (last 14 days)
 //   node tools/sheet.mjs images <coach_id> <dir>        writes a message's screenshots as <dir>/<part>.jpg
 //   node tools/sheet.mjs images-done <coach_id>         clears its screenshot slices once read
 //
@@ -63,9 +64,11 @@ export function formatNotes(res) {
 }
 
 // Joins slices 1..total of one upload (a recording, or one screenshot). Throws if any slice is
-// missing, so a half-uploaded file is left for the next run.
+// missing, so a half-uploaded file is left for the next run. A recording uploads while he is still
+// talking: those slices carry total 500 ("not known yet") and the ones sent after Stop carry the
+// real total, so the smallest total is the true one.
 export function assembleSlices(rows) {
-  const total = Number(rows[0].total);
+  const total = Math.min(...rows.map((r) => Number(r.total) || Infinity));
   const bySeq = new Map(rows.map((r) => [Number(r.seq), r]));
   const missing = [];
   for (let i = 1; i <= total; i++) if (!bySeq.has(i)) missing.push(i);
@@ -100,7 +103,7 @@ export function isoFromSheet(shown) {
 }
 
 // Everything the coach reads before replying, in one go. JSON cells (race, ladder) are parsed.
-export function coachContext({ profile, plan, runs, coach, notes }, today = new Date().toISOString().slice(0, 10)) {
+export function coachContext({ profile, plan, runs, coach, notes, lifting = [], inbox = [] }, today = new Date().toISOString().slice(0, 10)) {
   const parse = (v) => {
     try {
       return JSON.parse(v);
@@ -123,6 +126,14 @@ export function coachContext({ profile, plan, runs, coach, notes }, today = new 
     bjj_last_14_days: (notes?.rows ?? [])
       .map((r) => ({ date: isoFromSheet(r.cells[0]), hours: r.cells[2] || '' }))
       .filter((s) => s.date && s.date >= since && s.date <= today),
+    // One row per set (or per group of identical sets in rows from the first Lift screen).
+    lifting_last_14_days: lifting
+      .filter((r) => !r.hidden && r.status !== 'cancelled' && r.date >= since && r.date <= today)
+      .sort(byTime('created_at'))
+      .map((r) => ({ date: r.date, exercise: r.exercise, weight_kg: r.weight_kg, sets: r.sets, reps: r.reps, effort: r.effort || '' })),
+    dance_last_14_days: inbox
+      .filter((r) => !r.hidden && r.activity === 'dance' && !['cancelled', 'test'].includes(r.status) && r.session_date >= since && r.session_date <= today)
+      .map((r) => ({ date: r.session_date, hours: r.hours || '', tags: r.tags || '' })),
   };
 }
 
@@ -196,6 +207,8 @@ function main(argv) {
         runs: rows('App · Runs'),
         coach: rows('App · Coach'),
         notes: call('notes'),
+        lifting: rows('App · Lifting'),
+        inbox: rows('App · Inbox'),
       }, new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Singapore' }).format(new Date())));
     }
     case 'images': {

@@ -238,15 +238,17 @@ test('aliases: spaced and joined spellings find each other', () => {
   assert.equal(search(c, 'body lock').length, 1);
 });
 
-import { navItems } from '../src/nav.js';
+import { navItems, tabOf, LEGACY } from '../src/nav.js';
 
-test('nav: all six screens are one tap; Stats keeps Home lit', () => {
-  const items = navItems('analysis', { run: 2, home: 1 });
-  assert.deepEqual(items.map((i) => i.v), ['log', 'search', 'ask', 'run', 'lift', 'home']);
-  assert.equal(items.find((i) => i.v === 'home').on, true);
-  assert.equal(items.find((i) => i.v === 'home').badge, 1);
+test('nav: Today and one tab per activity; a screen inside a tab keeps it lit; old screen names map', () => {
+  const items = navItems('bjj/stats', { run: 2, today: 1 });
+  assert.deepEqual(items.map((i) => i.v), ['today', 'bjj', 'run', 'lift', 'dance', 'think']);
+  assert.equal(items.find((i) => i.v === 'bjj').on, true);
+  assert.equal(items.find((i) => i.v === 'today').badge, 1);
   assert.equal(items.find((i) => i.v === 'run').badge, 2);
-  assert.equal(navItems('log').find((i) => i.v === 'log').on, true);
+  assert.equal(navItems('dance/social').find((i) => i.v === 'dance').on, true);
+  assert.equal(tabOf('think/concept'), 'think');
+  assert.deepEqual([LEGACY.log, LEGACY.home, LEGACY.analysis, LEGACY.search], ['bjj', 'today', 'bjj/stats', 'bjj/search']);
 });
 
 import { pullDistance, shouldRefresh, THRESHOLD } from '../src/pull.js';

@@ -5,10 +5,14 @@ His requests (from `App · Feedback`) always go above your own items.
 
 ## Up next
 
-- [x] **Whole-week rework: IN PROGRESS in a laptop session with him (21 Nov).** Do not start feature work on
-      `src/`, `style.css`, `apps-script/` or the docs until this line is replaced by the rework's own items.
-      Chores (recordings, inbox, questions, coach, feedback, decisions) go on as normal. It supersedes the
-      multi-activity revamp below: six tabs (Today, BJJ, Run, Lift, Dance, Think), Code.gs v5 in one paste.
+- [ ] **One-time check after the rework** (21 Nov). Run `node tools/check-public.mjs f0c1e9f` (the laptop
+      session had no sheet token, so its pushes were checked for secrets only) and say in the log whether
+      it passed. Once `ping` reports version 5, set `acted_at` on decision `dec-multi-activity` (the v5 paste replaces it).
+- [ ] **Photos in a note** (from the rework, later). Script v5 already takes images on an Inbox item
+      (`inbox_id`, `images`): add "Add a photo" to the capture card (handouts, whiteboards), reusing
+      `shrink`/`imageBatches`, and read them when filing.
+- [x] **Whole-week rework** (he asked, 21 Nov). Shipped 1.0.0 from a laptop session: six tabs, Today from his
+      week, voice notes that can't be lost, the outbox, Lift sets, calmer coach log, Dance and Think, script v5.
 - [x] **Lift tab fixes** (he asked, 20 Nov). Add bench press to the lift choices, and fix the lift dropdown
       so it is not too wide and too short (size it to fit its content and make it taller/easier to tap).
 - [x] **Multi-activity revamp** (he asked, 19 Nov). Superseded 21 Nov by the whole-week rework above. Reading chosen: add Lifting, Dance (bachata cues) and

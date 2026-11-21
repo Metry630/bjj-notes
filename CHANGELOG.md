@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.0.0 (2026-11-21)
+
+- Six tabs: Today, BJJ, Run, Lift, Dance, Think. Today shows what is on from your week (tell the app your
+  week once), each with one tap: Record opens a recording with the activity, style and hours filled in.
+- Voice notes can't be lost any more: kept on the phone as you talk, sent while you talk, finished if the
+  app was closed, and kept until they are transcribed. Play or save the audio any time.
+- Everything you save waits safely on the phone until it is in the sheet; Undo after Remove, and a
+  Removed items list in Settings.
+- Lift: one tap per set (Log set), so several weights in one day just work; next weights from how it
+  felt, a rest timer, personal bests, history, and a progress chart.
+- Run: today's session on top, the report form only when needed, a calmer coach log (latest reply in
+  full, the rest one line each), runs on any weekday (Wednesday), progress charts.
+- Dance: talk through the class; moves build up by style with your cues, a level per move, the last
+  class before the next, and Before the social in big text for a dark room.
+- Think: concepts from the meetup in your words, researched by Claude with sources, this week's
+  practice and a question to bring.
+- BJJ on one tab: search, Before class with To try and a recall card, Ask, Stats.
+
+
 ## Sheet script v5 (2026-11-21)
 
 - One paste for everything in the whole-week rework (it also covers the pending Lift and Dance paste).

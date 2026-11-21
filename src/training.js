@@ -11,15 +11,52 @@ export function weekOf(plan, iso) {
   return plan.find((w) => w.start && w.start <= iso && iso < addDays(w.start, 7)) || null;
 }
 
-// The week's three runs with their dates and run types (fri_type etc., keys of the profile's
-// run_types; several joined by commas, e.g. "easy,strides").
+export const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+// The week's runs with their dates and run types (wed_type etc., keys of the profile's run_types;
+// several joined by commas, e.g. "easy,strides"). Any weekday can be a run day: a day counts when
+// the plan row has a session or a type for it. Weeks written before Nov 2026 use fri, sat and sun.
 export function sessionDays(week) {
-  return ['fri', 'sat', 'sun'].map((d, i) => ({
-    day: ['Fri', 'Sat', 'Sun'][i],
-    date: addDays(week.start, 4 + i),
+  return DAY_KEYS.map((d, i) => ({
+    day: DAY_NAMES[i],
+    key: d,
+    date: addDays(week.start, i),
     what: week[d],
     types: String(week[`${d}_type`] || '').split(',').map((t) => t.trim()).filter(Boolean),
-  }));
+  })).filter((s) => String(s.what ?? '').trim() || s.types.length);
+}
+
+// The plan's session on one date, or null (no plan for that week, or no run that day).
+export function sessionOn(plan, iso) {
+  const week = weekOf(plan, iso);
+  return week ? sessionDays(week).find((s) => s.date === iso) || null : null;
+}
+
+// The first planned run on or after `iso` (today's if there is one), with its week.
+export function nextSession(plan, iso) {
+  const all = [...plan]
+    .filter((w) => w.start)
+    .sort((a, b) => String(a.start).localeCompare(String(b.start)))
+    .flatMap((w) => sessionDays(w).map((s) => ({ ...s, week: w })));
+  return all.find((s) => s.date >= iso && !/^rest/i.test(String(s.what || ''))) || null;
+}
+
+const mondayOf = (iso) => addDays(iso, -((new Date(`${iso}T00:00:00Z`).getUTCDay() + 6) % 7));
+
+// Distance per calendar week (Monday start), oldest first, the last `weeks` weeks up to `todayIso`.
+export function weeklyKm(runs, todayIso, weeks = 12) {
+  const end = mondayOf(todayIso);
+  const out = Array.from({ length: weeks }, (_, i) => ({ start: addDays(end, -7 * (weeks - 1 - i)), km: 0, long: 0 }));
+  for (const r of runs) {
+    if (!r || r.hidden || !r.date) continue;
+    const slot = out.find((w) => w.start === mondayOf(String(r.date)));
+    if (!slot) continue;
+    const km = Number(r.distance_km) || 0;
+    slot.km = Math.round((slot.km + km) * 10) / 10;
+    slot.long = Math.max(slot.long, km);
+  }
+  return out;
 }
 
 // profile.run_types, [{ key, name, pace, feel, how }], keyed by `key`. The paces live only here,

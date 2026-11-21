@@ -32,3 +32,17 @@ export function reviewTopic(cells, topics, sessions, todayIso) {
   const day = Math.floor(Date.parse(`${todayIso}T00:00:00Z`) / 864e5);
   return pool[day % pool.length];
 }
+
+// Tips from the last two weeks he phrased as something to try next time (English or Indonesian),
+// newest first. They go on top of Before class, so a plan made after one class meets the next.
+const INTENT = /\b(next time|try|coba|harus|jangan lupa|remember to|should|lain kali|perlu)\b/i;
+export function toTry(cells, todayIso, days = 14, limit = 4) {
+  const from = new Date(Date.parse(`${todayIso}T00:00:00Z`) - days * 864e5).toISOString().slice(0, 10);
+  return cells
+    .filter((c) => {
+      const iso = sheetDateToISO(c.date);
+      return iso && iso >= from && iso <= todayIso && INTENT.test(String(c.text));
+    })
+    .sort((a, b) => sheetDateToISO(b.date).localeCompare(sheetDateToISO(a.date)) || a.col - b.col)
+    .slice(0, limit);
+}

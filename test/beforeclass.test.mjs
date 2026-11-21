@@ -36,6 +36,6 @@ test('reviewTopic: null when nothing qualifies', () => {
   assert.equal(reviewTopic([], topics, [], '2025-01-20'), null);
 });
 
-test('Home stays lit on Before class', () => {
-  assert.ok(navItems('before').find((i) => i.v === 'home').on);
+test('BJJ stays lit on Before class', () => {
+  assert.ok(navItems('bjj/before').find((i) => i.v === 'bjj').on);
 });

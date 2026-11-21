@@ -3,9 +3,41 @@
 // rather than reusing GitHub Pages' 10-minute browser cache. Only same-origin GET requests are touched; calls to
 // the sheet API go straight through.
 const CACHE = 'bjj-notes-shell';
-const SHELL = ['./', 'index.html', 'style.css', 'manifest.webmanifest', 'icon.svg', 'icon-180.png',
-  'src/app.js', 'src/analysis.js', 'src/api.js', 'src/dance.js', 'src/dates.js', 'src/images.js', 'src/lifting.js', 'src/nav.js', 'src/pull.js', 'src/queue.js', 'src/recorder.js',
-  'src/search.js', 'src/store.js', 'src/training.js'];
+const SHELL = [
+  './', 'index.html', 'style.css', 'manifest.webmanifest', 'icon.svg', 'icon-180.png',
+  'src/analysis.js',
+  'src/api.js',
+  'src/app.js',
+  'src/beforeclass.js',
+  'src/capture.js',
+  'src/charts.js',
+  'src/dates.js',
+  'src/icons.js',
+  'src/idb.js',
+  'src/images.js',
+  'src/journal.js',
+  'src/lifting.js',
+  'src/marks.js',
+  'src/nav.js',
+  'src/pull.js',
+  'src/queue.js',
+  'src/recorder.js',
+  'src/search.js',
+  'src/store.js',
+  'src/training.js',
+  'src/ui.js',
+  'src/util.js',
+  'src/views/bjj.js',
+  'src/views/dance.js',
+  'src/views/lift.js',
+  'src/views/run.js',
+  'src/views/settings.js',
+  'src/views/shared.js',
+  'src/views/think.js',
+  'src/views/today.js',
+  'src/voice.js',
+  'src/week.js',
+];
 
 self.addEventListener('install', (ev) => {
   ev.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

@@ -1,8 +1,8 @@
 # bjj-notes
 
-Dictate BJJ notes on your phone after training, keep them in a Google Sheet, search them instantly
-and ask questions that get answered from your own notes. The Run tab is a running coach: send
-Strava screenshots after a run and get a reply and an adjusted plan.
+A phone app for a whole training week: dictate BJJ, dance and philosophy notes, log lifts set by set,
+send runs to a running coach, and see what is on today. Notes live in a Google Sheet; a Claude routine
+files them, answers questions, researches philosophy concepts and coaches the runs.
 
 - **App:** static files on GitHub Pages (`index.html`, `src/`). No build, no dependencies.
 - **Data:** a Google Sheet, reached only through the Apps Script in `apps-script/Code.gs`. The
