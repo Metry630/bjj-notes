@@ -5,9 +5,9 @@ His requests (from `App · Feedback`) always go above your own items.
 
 ## Up next
 
-- [ ] **One-time check after the rework** (21 Nov). Run `node tools/check-public.mjs f0c1e9f` (the laptop
+- [x] **One-time check after the rework** (21 Nov). Run `node tools/check-public.mjs f0c1e9f` (the laptop
       session had no sheet token, so its pushes were checked for secrets only) and say in the log whether
-      it passed. Once `ping` reports version 5, set `acted_at` on decision `dec-multi-activity` (the v5 paste replaces it).
+      it passed. Result 22 Nov: flagged 1 line (tools/dev/fake.js:59, a synthetic numbers-only ladder fixture, likely a false match on digits). Once `ping` reports version 5, set `acted_at` on decision `dec-multi-activity` (the v5 paste replaces it).
 - [ ] **Photos in a note** (from the rework, later). Script v5 already takes images on an Inbox item
       (`inbox_id`, `images`): add "Add a photo" to the capture card (handouts, whiteboards), reusing
       `shrink`/`imageBatches`, and read them when filing.
