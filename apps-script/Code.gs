@@ -14,13 +14,23 @@
  *   token) fills the empty cells of that date's row or adds a row in date order; pruneRow deletes
  *   only a row holding nothing but a date (what a failed save used to leave behind).
  * - Only "App · *" tabs are read or written, never "App · Setup" (it shows the tokens).
- * - Phone token: read, add to Inbox/Questions/Feedback/Audio and Coach/Images (running coach
- *   messages and Strava screenshots), edit or cancel its own items while they are still "new",
- *   rate a filed note, answer an open decision, set the routine mode, and start a run (runNow).
- *   Agent token: reads, appendSession, any other App tab. It can't start runs.
+ * - Phone token: read, add to Inbox/Questions/Feedback/Audio, Coach/Images (running coach
+ *   messages and Strava screenshots), Lifting (one row per set), Dance and Marks (append-only),
+ *   edit or cancel its own items while they are still "new", restore an item it cancelled, rate a
+ *   filed note, answer an open decision, set the routine mode, and start a run (runNow).
+ *   Agent token: reads, fileSession, any other App tab. It can't start runs.
+ * - His words are write-once for the agent: a filled field holding his input (HIS_FIELDS) can be
+ *   filled while empty but never changed. To correct something, the routine hides the row and
+ *   adds a new one.
+ * - Every change to a non-empty App cell is copied to App · History first (old and new value,
+ *   who, when). Nobody can write to App · History through the API.
+ * - ping returns CODE_VERSION, so the app knows which of these rules are live.
  *
  * Every response is HTTP 200 JSON; check `ok`. Token goes in the JSON body (`token`) or as ?k=.
  */
+
+// Bump on every change the app depends on. 5: activities, marks, journal, protected fields, history.
+const CODE_VERSION = 5;
 
 const NOTES_SHEET = 'Sheet1';
 const APP = 'App · ';
@@ -34,32 +44,59 @@ const TABS = {
   'App · Audio': ['id', 'created_at', 'inbox_id', 'seq', 'total', 'mime', 'data', 'status'],
   'App · Decisions': ['id', 'created_at', 'question', 'options', 'recommended', 'status', 'answer', 'answered_at'],
   'App · Coach': ['id', 'created_at', 'kind', 'run_date', 'text', 'feel', 'pain', 'images', 'status', 'reply', 'replied_at'],
-  'App · Images': ['id', 'created_at', 'coach_id', 'part', 'seq', 'total', 'mime', 'data', 'status'],
-  'App · Lifting': ['id', 'created_at', 'date', 'exercise', 'weight_kg', 'sets', 'reps', 'note', 'status'],
+  'App · Images': ['id', 'created_at', 'coach_id', 'part', 'seq', 'total', 'mime', 'data', 'status', 'inbox_id'],
+  'App · Lifting': ['id', 'created_at', 'date', 'exercise', 'weight_kg', 'sets', 'reps', 'note', 'status', 'effort'],
   'App · Dance': ['id', 'created_at', 'move', 'cue', 'status'],
+  // Phone-written, append-only: small facts the app keeps (a move's level). The latest row wins.
+  'App · Marks': ['id', 'created_at', 'target', 'field', 'value'],
+  // Agent-written: one row per filed tip for every activity except BJJ (BJJ goes to Sheet1).
+  'App · Journal': ['id', 'created_at', 'session_date', 'activity', 'topic', 'text', 'tags', 'source_id', 'seq'],
+  // Server-written only: the old value of every changed cell.
+  'App · History': ['id', 'at', 'role', 'tab', 'row_id', 'field', 'old', 'new'],
 };
-TABS['App · Inbox'] = TABS['App · Inbox'].concat(['method', 'rating']);
+TABS['App · Inbox'] = TABS['App · Inbox'].concat(['method', 'rating', 'activity', 'tags', 'images']);
+TABS['App · Questions'] = TABS['App · Questions'].concat(['activity', 'kind']);
 // What the phone may set on its own rows; everything else is server- or agent-set.
 const PHONE_FIELDS = {
-  'App · Inbox': ['session_date', 'location', 'hours', 'text', 'method'],
-  'App · Questions': ['question'],
+  'App · Inbox': ['session_date', 'location', 'hours', 'text', 'method', 'activity', 'tags', 'images'],
+  'App · Questions': ['question', 'activity', 'kind'],
   'App · Feedback': ['text'],
   'App · Audio': ['inbox_id', 'seq', 'total', 'mime', 'data'],
   'App · Coach': ['kind', 'run_date', 'text', 'feel', 'pain', 'images'],
-  'App · Images': ['coach_id', 'part', 'seq', 'total', 'mime', 'data'],
-  'App · Lifting': ['date', 'exercise', 'weight_kg', 'sets', 'reps', 'note'],
+  'App · Images': ['coach_id', 'inbox_id', 'part', 'seq', 'total', 'mime', 'data'],
+  'App · Lifting': ['date', 'exercise', 'weight_kg', 'sets', 'reps', 'note', 'effort'],
   'App · Dance': ['move', 'cue'],
+  'App · Marks': ['target', 'field', 'value'],
 };
 // Fields the phone may change at any time, not only while an item is still "new".
 const PHONE_ANYTIME = { 'App · Inbox': ['rating'], 'App · Coach': ['rating'] };
+// His input. The agent may fill these while empty, never change them once filled.
+const HIS_FIELDS_EVERYWHERE = ['text', 'question'];
+const HIS_FIELDS = {
+  'App · Inbox': ['session_date', 'location', 'hours', 'method', 'activity', 'tags', 'images', 'rating'],
+  'App · Questions': ['activity', 'kind'],
+  'App · Coach': ['kind', 'run_date', 'feel', 'pain', 'images', 'rating'],
+  'App · Lifting': ['date', 'exercise', 'weight_kg', 'sets', 'reps', 'note', 'effort'],
+  'App · Dance': ['move', 'cue'],
+  'App · Marks': ['target', 'field', 'value'],
+  'App · Decisions': ['answer', 'answered_at'],
+};
+// Transient upload slices: cleared once read, never worth a History copy.
+const NO_HISTORY = ['App · Audio', 'App · Images'];
 const DECISIONS_TAB = APP + 'Decisions';
+const MARKS_TAB = APP + 'Marks';
+const HISTORY_TAB = APP + 'History';
 const METHODS = ['keyboard', 'recording'];
+const ACTIVITIES = ['bjj', 'dance', 'philosophy', 'run', 'lift', 'other'];
+const QUESTION_KINDS = ['question', 'week'];
+const EFFORTS = ['easy', 'ok', 'hard', 'max'];
 // A coach message is a run report (with screenshots), a question, or the next-morning check.
 const KINDS = ['run', 'ask', 'checkin'];
 const FEELS = ['easy', 'ok', 'hard', 'very hard'];
 const CREATED_FIELD = {
   'App · Inbox': 'created_at', 'App · Questions': 'asked_at', 'App · Feedback': 'created_at', 'App · Audio': 'created_at',
   'App · Coach': 'created_at', 'App · Images': 'created_at', 'App · Lifting': 'created_at', 'App · Dance': 'created_at',
+  'App · Marks': 'created_at', 'App · Journal': 'created_at',
 };
 // Run now: the routine's API trigger. Its token (sk-ant-oat01-...) lives in Script Properties as
 // RUN_TOKEN and can only start this one routine.
@@ -94,7 +131,7 @@ function doGet() {
 function handle_(role, req) {
   switch (req.action) {
     case 'ping':
-      return { role: role };
+      return { role: role, version: CODE_VERSION };
     case 'notes':
       return readNotes_();
     case 'get':
@@ -131,7 +168,7 @@ function handle_(role, req) {
 
 // Several reads in one round trip (Apps Script calls cost ~1-2 s each).
 function batch_(role, calls) {
-  if (!Array.isArray(calls) || calls.length > 20) throw new Error('bad_calls');
+  if (!Array.isArray(calls) || calls.length > 40) throw new Error('bad_calls');
   return calls.map(function (c) {
     if (!c || READ_ACTIONS.indexOf(c.action) < 0 || c.set) return { ok: false, error: 'batch_is_read_only' };
     try {
@@ -437,6 +474,7 @@ function readTab_(tab) {
 
 function add_(role, tab, rows) {
   if (!Array.isArray(rows) || !rows.length || rows.length > 50) throw new Error('bad_rows');
+  if (tab === HISTORY_TAB) throw new Error('forbidden'); // only the script writes history
   if (role === 'phone' && !PHONE_FIELDS[tab]) throw new Error('forbidden');
   const sh = ensureTab_(tab, role === 'agent' ? Object.keys(rows[0] || {}) : null);
   let header = header_(sh);
@@ -462,6 +500,7 @@ function add_(role, tab, rows) {
 
 function update_(role, tab, id, fields) {
   if (!id || !fields || typeof fields !== 'object') throw new Error('bad_update');
+  if (tab === HISTORY_TAB) throw new Error('forbidden');
   const sh = ss_().getSheetByName(tab);
   if (!sh) throw new Error('no_such_tab');
   let header = header_(sh);
@@ -469,9 +508,10 @@ function update_(role, tab, id, fields) {
   const r = idIndex_(sh, header)[String(id)];
   if (!r) throw new Error('no_such_id');
   let keys = Object.keys(fields).filter(function (k) { return k !== 'id' && k !== '_row'; });
+  const current = rowObject_(sh, r, header);
   if (role === 'phone') {
-    const current = rowObject_(sh, r, header);
     const anytime = PHONE_ANYTIME[tab] || [];
+    if (tab === MARKS_TAB) throw new Error('append_only');
     if (tab === DECISIONS_TAB) {
       if (keys.length !== 1 || keys[0] !== 'answer') throw new Error('forbidden_field');
       if (current.status !== 'open') throw new Error('already_answered');
@@ -481,6 +521,8 @@ function update_(role, tab, id, fields) {
       keys = Object.keys(fields);
     } else if (keys.length && keys.every(function (k) { return anytime.indexOf(k) >= 0; })) {
       if (keys.indexOf('rating') >= 0 && !/^[1-5]$/.test(String(fields.rating))) throw new Error('bad_rating');
+    } else if (PHONE_FIELDS[tab] && keys.length === 1 && keys[0] === 'status' && fields.status === 'new' && current.status === 'cancelled') {
+      // Undo / Restore: an item he removed comes back exactly as it was.
     } else {
       if (!PHONE_FIELDS[tab]) throw new Error('forbidden');
       if (current.status !== 'new') throw new Error('already_processed');
@@ -491,7 +533,24 @@ function update_(role, tab, id, fields) {
       });
     }
   } else {
+    // His words are write-once for the routine: fill an empty field, never change a filled one.
+    keys.forEach(function (k) {
+      if (!isHis_(tab, k)) return;
+      const was = current[k];
+      if (was === '' || was == null) return;
+      if (!unchanged_(was, fields[k])) throw new Error('protected_field: ' + k);
+    });
     header = growHeader_(sh, header, keys);
+  }
+  // Copy every value about to be replaced to App · History before it is replaced.
+  if (NO_HISTORY.indexOf(tab) < 0) {
+    const at = new Date().toISOString();
+    logHistory_(keys.filter(function (k) {
+      const was = current[k];
+      return header.indexOf(k) >= 0 && was !== '' && was != null && !unchanged_(was, fields[k]);
+    }).map(function (k) {
+      return { id: Utilities.getUuid(), at: at, role: role, tab: tab, row_id: String(id), field: k, old: String(current[k]), new: clean_(fields[k]) };
+    }));
   }
   keys.forEach(function (k) {
     const c = header.indexOf(k) + 1;
@@ -501,6 +560,25 @@ function update_(role, tab, id, fields) {
     cell.setValue(clean_(fields[k]));
   });
   return { id: String(id), row: r };
+}
+
+// Same value again (a re-run writing what is already there) is not a change. Sheets keeps a
+// leading apostrophe out of the stored value, so "'=x" written comes back as "=x".
+function unchanged_(was, value) {
+  const v = clean_(value);
+  return String(was) === v || (v.charAt(0) === "'" && String(was) === v.slice(1));
+}
+
+function isHis_(tab, field) {
+  return HIS_FIELDS_EVERYWHERE.indexOf(field) >= 0 || (HIS_FIELDS[tab] || []).indexOf(field) >= 0;
+}
+
+function logHistory_(entries) {
+  if (!entries.length) return;
+  const sh = ensureTab_(HISTORY_TAB, null);
+  const header = growHeader_(sh, header_(sh), TABS[HISTORY_TAB]);
+  const first = sh.getLastRow() + 1;
+  entries.forEach(function (e, i) { writeRow_(sh, first + i, header, e); });
 }
 
 function settings_(role, set) {
@@ -519,24 +597,52 @@ function phoneRow_(tab, input) {
     if (input && input[k] != null) row[k] = input[k];
   });
   if (row.method != null && METHODS.indexOf(row.method) < 0) throw new Error('bad_method');
+  if (tab === 'App · Inbox') checkInbox_(row);
+  if (tab === 'App · Questions') checkQuestion_(row);
   if (tab === 'App · Audio') checkAudio_(row);
   if (tab === 'App · Coach') checkCoach_(row);
   if (tab === 'App · Images') checkImage_(row);
   if (tab === 'App · Lifting') checkLifting_(row);
   if (tab === 'App · Dance') checkDance_(row);
+  if (tab === MARKS_TAB) checkMark_(row);
   row.status = 'new';
   return row;
 }
 
-const LIFTS = ['Squat', 'Deadlift', 'Bench press', 'Chin ups', 'Pull ups'];
+const blank_ = function (v) { return v == null || v === ''; };
+
+// Which activity a note is for (none = BJJ, as before v5) and short tags (salsa,class).
+function checkInbox_(row) {
+  if (!blank_(row.activity) && ACTIVITIES.indexOf(row.activity) < 0) throw new Error('bad_activity');
+  if (!blank_(row.tags) && !/^[a-z0-9 ,.-]{1,100}$/.test(String(row.tags))) throw new Error('bad_tags');
+  const n = Number(blank_(row.images) ? 0 : row.images);
+  if (!(Math.floor(n) === n && n >= 0 && n <= 6)) throw new Error('bad_images');
+}
+
+function checkQuestion_(row) {
+  if (!blank_(row.activity) && ACTIVITIES.indexOf(row.activity) < 0) throw new Error('bad_activity');
+  if (!blank_(row.kind) && QUESTION_KINDS.indexOf(row.kind) < 0) throw new Error('bad_kind');
+}
+
+// One row per set (or per group of identical sets). Any exercise name, so a new lift needs no paste.
 function checkLifting_(row) {
-  if (LIFTS.indexOf(row.exercise) < 0) throw new Error('bad_exercise');
+  const name = String(row.exercise == null ? '' : row.exercise).trim();
+  if (!name || name.length > 40) throw new Error('bad_exercise');
   isoDate_(row.date);
   const w = Number(row.weight_kg == null || row.weight_kg === '' ? 0 : row.weight_kg);
   if (!(w >= 0 && w <= 500)) throw new Error('bad_weight');
   if (!(Number(row.sets) >= 1 && Number(row.sets) <= 20)) throw new Error('bad_sets');
   if (!(Number(row.reps) >= 1 && Number(row.reps) <= 100)) throw new Error('bad_reps');
   if (row.note != null && String(row.note).length > 200) throw new Error('bad_note');
+  if (!blank_(row.effort) && EFFORTS.indexOf(row.effort) < 0) throw new Error('bad_effort');
+}
+
+// target: what it is about ("topic:dance-sombrero"), field: which fact ("level"), value: short.
+function checkMark_(row) {
+  const target = String(row.target == null ? '' : row.target);
+  if (!target || target.length > 100) throw new Error('bad_target');
+  if (!/^[a-z_]{1,30}$/.test(String(row.field || ''))) throw new Error('bad_field');
+  if (row.value != null && String(row.value).length > 500) throw new Error('bad_value');
 }
 
 function checkDance_(row) {
@@ -555,14 +661,16 @@ function checkCoach_(row) {
   if (!(Math.floor(n) === n && n >= 0 && n <= 6)) throw new Error('bad_images');
 }
 
-// One base64 slice of one screenshot: part 1..6 of a coach message, slices 1..total of that part.
+// One base64 slice of one image: part 1..6 of its message, slices 1..total of that part.
 function checkImage_(row) {
   const part = Number(row.part);
   const seq = Number(row.seq);
   const total = Number(row.total);
   const data = String(row.data || '');
+  // A screenshot belongs to a coach message, or (later) a photo to a note: exactly one of them.
+  const parent = blank_(row.coach_id) ? row.inbox_id : blank_(row.inbox_id) ? row.coach_id : '';
   const ok =
-    row.coach_id && String(row.coach_id).length <= 64 && /^image\/(jpeg|png|webp)$/.test(String(row.mime || '')) &&
+    parent && String(parent).length <= 64 && /^image\/(jpeg|png|webp)$/.test(String(row.mime || '')) &&
     /^[A-Za-z0-9+\/=]+$/.test(data) && data.length <= MAX_TEXT &&
     Math.floor(part) === part && part >= 1 && part <= 6 &&
     Math.floor(seq) === seq && Math.floor(total) === total && seq >= 1 && seq <= total && total <= 200;

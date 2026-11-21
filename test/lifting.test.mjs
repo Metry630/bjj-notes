@@ -40,7 +40,10 @@ test('Code.gs: phone can add a lift, bad ones are refused', () => {
   const add = (row) => env.post({ action: 'add', tab: 'App · Lifting', rows: [row], token: phone });
   const ok = { date: '2026-01-01', exercise: 'Squat', weight_kg: 60, sets: 5, reps: 5 };
   assert.equal(add(ok).ok, true);
-  assert.equal(add({ ...ok, exercise: 'Curl' }).error, 'bad_exercise');
+  // v5: any exercise name, so a new lift needs no script paste; empty or very long ones are refused.
+  assert.equal(add({ ...ok, exercise: 'Curl' }).ok, true);
+  assert.equal(add({ ...ok, exercise: ' ' }).error, 'bad_exercise');
+  assert.equal(add({ ...ok, exercise: 'x'.repeat(41) }).error, 'bad_exercise');
   assert.equal(add({ ...ok, date: 'x' }).error, 'bad_date');
   assert.equal(add({ ...ok, reps: 0 }).error, 'bad_reps');
   assert.equal(add({ ...ok, weight_kg: 900 }).error, 'bad_weight');

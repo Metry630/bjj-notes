@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Run before every push: this repo is public, his notes are not.
 // Fails if the diff adds the API URL, the token, or any 8-word run that also appears in his notes,
-// inbox, questions, feedback or the running coach tabs. Prints file:line only, never the matching text.
+// inbox, questions, feedback, journal, lifts, marks, history or the running coach tabs (his week too). Prints file:line only, never the matching text.
 //
 //   node tools/check-public.mjs [git-range]     default origin/main (diff of everything not yet pushed)
 import { execFileSync } from 'node:child_process';
@@ -57,7 +57,9 @@ function main() {
   const diff = execFileSync('git', ['diff', '-U0', range], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   const notes = call('notes');
   const texts = notes.rows.flatMap((r) => r.cells);
-  for (const tab of ['App · Inbox', 'App · Questions', 'App · Feedback', 'App · Topics', 'App · Coach', 'App · Runs', 'App · Plan', 'App · Profile']) {
+  const tabs = ['App · Inbox', 'App · Questions', 'App · Feedback', 'App · Topics', 'App · Coach', 'App · Runs', 'App · Plan',
+    'App · Profile', 'App · Journal', 'App · Lifting', 'App · Dance', 'App · Marks', 'App · History'];
+  for (const tab of tabs) {
     try {
       for (const row of call('get', { tab }).rows) texts.push(...Object.values(row).map(String));
     } catch {

@@ -1,5 +1,14 @@
 # Changelog
 
+## Sheet script v5 (2026-11-21)
+
+- One paste for everything in the whole-week rework (it also covers the pending Lift and Dance paste).
+- Notes and questions carry an activity (BJJ, dance, philosophy and more); a note with none is BJJ, as before.
+- Lifting takes any exercise name and how a set felt; App · Marks (append-only) and App · Journal are new.
+- Safer data: the routine can fill an empty field but never change his words once written, every change to a
+  filled cell is copied to App · History first, and an item he removed can be restored.
+- The script reports its version, so the app knows what is live.
+
 ## 0.12.0 (2026-11-21)
 
 - New Dance screen, one tap from the Lift tab (Lift | Dance switch at the top): save cues per move, see moves with their cues in collapsible sections, and a "Remind me of a move" button for before class. Needs the updated Code.gs pasted (same paste as the Lift tab).
