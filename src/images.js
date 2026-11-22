@@ -50,9 +50,10 @@ export async function shrink(file, { max = MAX_EDGE, quality = 0.8 } = {}) {
 }
 
 // App · Images rows for screenshot `part` (1..6) of coach message `coachId`, 10 per request.
-export function imageBatches(coachId, part, b64, mime = 'image/jpeg', perBatch = 10) {
+// `owner` is 'coach_id' (a run report) or 'inbox_id' (a photo with a note).
+export function imageBatches(coachId, part, b64, mime = 'image/jpeg', perBatch = 10, owner = 'coach_id') {
   const parts = slices(b64);
-  const rows = parts.map((data, i) => ({ id: `${coachId}.${part}-${i + 1}`, coach_id: coachId, part, seq: i + 1, total: parts.length, mime, data }));
+  const rows = parts.map((data, i) => ({ id: `${coachId}.${part}-${i + 1}`, [owner]: coachId, part, seq: i + 1, total: parts.length, mime, data }));
   const out = [];
   for (let i = 0; i < rows.length; i += perBatch) out.push(rows.slice(i, i + perBatch));
   return out;

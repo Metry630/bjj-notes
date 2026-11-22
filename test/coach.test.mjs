@@ -180,3 +180,14 @@ test('version.json matches the app version (the phone reloads when they differ)'
   const version = /export const VERSION = '([^']+)'/.exec(app)[1];
   assert.equal(JSON.parse(readFileSync(new URL('../version.json', import.meta.url), 'utf8')).version, version);
 });
+
+test('imageBatches can belong to a note (inbox_id)', () => {
+  const [rows] = imageBatches('n1', 1, 'QUJD', 'image/jpeg', 10, 'inbox_id');
+  assert.equal(rows[0].inbox_id, 'n1');
+  assert.equal(rows[0].coach_id, undefined);
+});
+
+test('assembleImages finds a note photo by inbox id', () => {
+  const [rows] = imageBatches('n1', 1, 'QUJD', 'image/jpeg', 10, 'inbox_id');
+  assert.equal(assembleImages(rows, 'n1', 1).length, 1);
+});

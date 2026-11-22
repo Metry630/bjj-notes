@@ -26,7 +26,7 @@
 //   node tools/sheet.mjs coach                          new messages, oldest first
 //   node tools/sheet.mjs coach-context                  profile (incl. his week), plan, recent runs and exchanges,
 //                                                       BJJ, lifting and dance load (last 14 days)
-//   node tools/sheet.mjs images <coach_id> <dir>        writes a message's screenshots as <dir>/<part>.jpg
+//   node tools/sheet.mjs images <coach_id|inbox_id> <dir>  writes a message's or note's screenshots as <dir>/<part>.jpg
 //   node tools/sheet.mjs images-done <coach_id>         clears its screenshot slices once read
 //
 // Any *.json argument may be "-" to read from stdin.
@@ -86,7 +86,7 @@ export function assembleAudio(rows, inboxId) {
 // The screenshots of one coach message, part by part. `expected` is the message's `images` count:
 // fewer parts than that means the phone is still uploading.
 export function assembleImages(rows, coachId, expected) {
-  const mine = rows.filter((r) => String(r.coach_id) === String(coachId) && r.status !== 'done');
+  const mine = rows.filter((r) => (String(r.coach_id) === String(coachId) || String(r.inbox_id) === String(coachId)) && r.status !== 'done');
   const parts = [...new Set(mine.map((r) => Number(r.part)))].sort((a, b) => a - b);
   if (parts.length < Number(expected || 0)) throw new Error(`incomplete: ${parts.length}/${expected} screenshots uploaded`);
   return parts.map((part) => ({ part, ...assembleSlices(mine.filter((r) => Number(r.part) === part)) }));
@@ -212,8 +212,8 @@ function main(argv) {
       }, new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Singapore' }).format(new Date())));
     }
     case 'images': {
-      const msg = call('get', { tab: 'App · Coach' }).rows.find((r) => String(r.id) === rest[0]);
-      if (!msg) throw new Error(`no coach message ${rest[0]}`);
+      const msg = ['App · Coach', 'App · Inbox'].map((tab) => call('get', { tab }).rows.find((r) => String(r.id) === rest[0])).find(Boolean);
+      if (!msg) throw new Error(`no coach message or note ${rest[0]}`);
       const parts = assembleImages(call('get', { tab: 'App · Images' }).rows, rest[0], msg.images);
       mkdirSync(rest[1], { recursive: true });
       return print(parts.map((p) => {
@@ -223,7 +223,7 @@ function main(argv) {
       }));
     }
     case 'images-done': {
-      const rows = call('get', { tab: 'App · Images' }).rows.filter((r) => String(r.coach_id) === rest[0] && r.status !== 'done');
+      const rows = call('get', { tab: 'App · Images' }).rows.filter((r) => (String(r.coach_id) === rest[0] || String(r.inbox_id) === rest[0]) && r.status !== 'done');
       for (const r of rows) call('update', { tab: 'App · Images', id: r.id, fields: { data: '', status: 'done' } });
       return print({ cleared: rows.length });
     }

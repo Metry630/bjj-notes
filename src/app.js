@@ -24,7 +24,7 @@ import { lift, liftProgress } from './views/lift.js';
 import { dance, danceMove, danceSocial, danceSearch } from './views/dance.js';
 import { think, thinkConcept, thinkAsk, thinkSearch } from './views/think.js';
 
-export const VERSION = '1.0.0';
+export const VERSION = '1.1.0';
 
 const TABS = {
   inbox: 'App · Inbox',

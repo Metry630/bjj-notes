@@ -3,6 +3,7 @@
 // through the outbox. Either way the routine files it within minutes, outside quiet hours.
 import { h, fill, picker, sheet, toast, fold } from './ui.js';
 import { icon } from './icons.js';
+import { shrink, imageBatches, MAX_IMAGES } from './images.js';
 import { store } from './store.js';
 import * as voice from './voice.js';
 import { TEST_MARK } from './recorder.js';
@@ -225,6 +226,32 @@ export function captureCard(ctx, activity) {
   const text = h('textarea', { rows: '5', value: draft.text, placeholder: cfg.placeholder });
   const keep = () => store.set(cfg.draftKey, { id: draft.id, date: meta.read().session_date, location: meta.read().location, hours: meta.read().hours, text: text.value });
   for (const el of [text, ...meta.inputs]) el.addEventListener('input', keep);
+  let photos = [];
+  const pick = h('input', { type: 'file', accept: 'image/*', multiple: true, class: 'vh' });
+  const addPhoto = h('label', { class: 'secondary filepick' }, icon('image', { size: 20 }), h('span', null, 'Add a photo'), pick);
+  const thumbs = h('div', { class: 'thumbs' });
+  const drawThumbs = () => {
+    fill(thumbs, photos.map((x, i) => h('div', { class: 'thumb' }, h('img', { src: x.dataUrl, alt: `Photo ${i + 1}` }), h('button', { type: 'button', class: 'link small', onclick: () => { photos.splice(i, 1); drawThumbs(); } }, 'Remove'))));
+    addPhoto.querySelector('span').textContent = photos.length ? 'Add another photo' : 'Add a photo';
+    pick.disabled = photos.length >= MAX_IMAGES;
+    addPhoto.classList.toggle('off', pick.disabled);
+  };
+  pick.addEventListener('change', async () => {
+    const files = [...pick.files].slice(0, MAX_IMAGES - photos.length);
+    pick.value = '';
+    if (!files.length) return;
+    say('Preparing photos…');
+    let failed = 0;
+    for (const f of files) {
+      try {
+        photos.push(await shrink(f));
+      } catch {
+        failed++;
+      }
+    }
+    say(failed ? `${plural(failed, 'file')} could not be read as an image.` : '');
+    drawThumbs();
+  });
   const save = h('button', { class: 'primary', type: 'submit' }, 'Save');
   const form = h('form', {
     onsubmit: async (ev) => {
@@ -232,8 +259,14 @@ export function captureCard(ctx, activity) {
       if (!text.value.trim()) return say('Nothing to save yet.');
       save.disabled = true;
       const m = getMeta();
-      const row = { id: draft.id, session_date: m.session_date, location: m.location, hours: m.hours, text: text.value, method: 'keyboard', activity: activity === 'bjj' ? '' : activity, tags: m.tags.join(',') };
-      const sent = await ctx.submit([{ tab: ctx.TABS.inbox, rows: [row] }], say, 'Saving');
+      const row = { id: draft.id, session_date: m.session_date, location: m.location, hours: m.hours, text: text.value, method: 'keyboard', activity: activity === 'bjj' ? '' : activity, tags: m.tags.join(','), images: photos.length };
+      const entries = [
+        { tab: ctx.TABS.inbox, rows: [row] },
+        ...photos.flatMap((x, i) => imageBatches(row.id, i + 1, x.b64, x.mime, 10, 'inbox_id').map((rows) => ({ tab: ctx.TABS.images, rows }))),
+      ];
+      const sent = await ctx.submit(entries, say, photos.length ? `Sending ${plural(photos.length, 'photo')}` : 'Saving');
+      photos = [];
+      drawThumbs();
       remember();
       draft.id = uid();
       text.value = '';
@@ -245,7 +278,7 @@ export function captureCard(ctx, activity) {
       save.disabled = false;
       ctx.update();
     },
-  }, text, save);
+  }, text, addPhoto, thumbs, save);
   const typeBox = h('details', { class: 'type', open: draft.text || store.get(cfg.typeOpenKey, false) ? true : null, ontoggle: (e) => store.set(cfg.typeOpenKey, e.target.open) }, h('summary', null, 'Type instead'), form);
 
   const card = h(

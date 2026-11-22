@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.0 (2026-11-22)
+
+- Add a photo to a typed note (handouts, whiteboards) on BJJ, Dance and Think. The routine reads it when filing.
+
 ## 1.0.0 (2026-11-21)
 
 - Six tabs: Today, BJJ, Run, Lift, Dance, Think. Today shows what is on from your week (tell the app your
