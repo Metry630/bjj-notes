@@ -6,7 +6,7 @@ import { icon } from './icons.js';
 import { shrink, imageBatches, MAX_IMAGES } from './images.js';
 import { store } from './store.js';
 import * as voice from './voice.js';
-import { TEST_MARK } from './recorder.js';
+import { TEST_MARK, audioOfFile } from './recorder.js';
 import { todayISO, draftDate, isoToSheetDate } from './dates.js';
 import { dayLabel } from './training.js';
 import { uid, clock, plural, oldest, newest, activityOf, tagList } from './util.js';
@@ -192,6 +192,58 @@ function recorderControls(ctx, { activity, getMeta, onDone, say }) {
   return { el: h('div', { class: 'recorder' }, btn, live, time, row, testRow, cues), start, recording: () => !!session };
 }
 
+// "Add a class video": the sound of a breakdown video he took is recorded as the video plays, then
+// goes the same way as a voice note (kept on the phone, uploaded, transcribed by the routine).
+function videoImport(ctx, { activity, getMeta, say, onDone, busy }) {
+  const input = h('input', { type: 'file', accept: 'video/*,audio/*', class: 'vh' });
+  const label = h('label', { class: 'secondary filepick' }, icon('image', { size: 20 }), h('span', null, 'Add a class video'), input);
+  let session = null;
+  const finish = async (src, ok) => {
+    const s = session;
+    session = null;
+    src.stop();
+    label.classList.remove('off');
+    input.disabled = false;
+    label.querySelector('span').textContent = 'Add a class video';
+    try {
+      const out = await s.stop({ ...getMeta(), tags: [...getMeta().tags, 'breakdown'], test: false });
+      say(ok ? `Saved ${clock(out.seconds)} of the video on this phone. Sending it now.` : `The video stopped early. Saved the first ${clock(out.seconds)}.`);
+      onDone?.(out);
+    } catch {
+      say('No sound could be read from that video. Try another file.');
+    }
+  };
+  input.addEventListener('change', async () => {
+    const f = input.files[0];
+    input.value = '';
+    if (!f || busy()) return;
+    let src;
+    try {
+      src = audioOfFile(f);
+      session = await voice.record({ activity, ...getMeta(), tags: [...getMeta().tags, 'breakdown'] }, { stream: src.stream });
+      await src.start();
+    } catch {
+      src?.stop();
+      if (session) await session.cancel().catch(() => {});
+      session = null;
+      say('This phone could not read that video. Record the breakdown with the mic instead.');
+      return;
+    }
+    input.disabled = true;
+    label.classList.add('off');
+    const tick = setInterval(() => {
+      const d = src.video.duration;
+      label.querySelector('span').textContent = `Reading the video ${clock(Math.round(src.video.currentTime))}${d ? ' / ' + clock(Math.round(d)) : ''}. Keep this open.`;
+    }, 1000);
+    say('Reading the sound as the video plays. Keep the app open until it finishes.');
+    src.done.then((ok) => {
+      clearInterval(tick);
+      finish(src, ok);
+    });
+  });
+  return { el: label, active: () => !!session };
+}
+
 // What happens after a save: start a run so it is filed now (outside quiet hours).
 const filed = (ctx, say) => ctx.fileNow({ auto: true, say });
 
@@ -223,6 +275,7 @@ export function captureCard(ctx, activity) {
     },
   });
 
+  const vid = videoImport(ctx, { activity, getMeta, say, busy: () => rec.recording(), onDone: () => { remember(); ctx.update(); } });
   const text = h('textarea', { rows: '5', value: draft.text, placeholder: cfg.placeholder });
   const keep = () => store.set(cfg.draftKey, { id: draft.id, date: meta.read().session_date, location: meta.read().location, hours: meta.read().hours, text: text.value });
   for (const el of [text, ...meta.inputs]) el.addEventListener('input', keep);
@@ -287,6 +340,7 @@ export function captureCard(ctx, activity) {
     meta.el,
     groups.length ? h('div', { class: 'groups' }, groups.map(({ p }) => p.el)) : null,
     rec.el,
+    vid.el,
     msg,
     typeBox
   );

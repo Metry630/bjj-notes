@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.0 (2026-11-28)
+
+- Add a class video: pick the breakdown video from the phone and its sound is sent like a voice note (about as long as the video, keep the app open). Filed with the tag breakdown.
+
 ## 1.1.0 (2026-11-22)
 
 - Add a photo to a typed note (handouts, whiteboards) on BJJ, Dance and Think. The routine reads it when filing.

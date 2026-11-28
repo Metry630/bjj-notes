@@ -35,8 +35,8 @@ export function blobToBase64(blob) {
 
 // 32 kbps is plenty for speech and keeps a 5-minute note around 1.2 MB. `onChunk` gets every
 // second of audio as it arrives, so it can be written to the phone's database straight away.
-export async function startRecording({ onChunk } = {}) {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+export async function startRecording({ onChunk, stream: given } = {}) {
+  const stream = given || (await navigator.mediaDevices.getUserMedia({ audio: true }));
   const wanted = pickMime();
   const rec = new MediaRecorder(stream, { ...(wanted ? { mimeType: wanted } : {}), audioBitsPerSecond: 32000 });
   const chunks = [];
@@ -137,3 +137,37 @@ export async function startRecording({ onChunk } = {}) {
 // A recording saved with the Test switch on carries this as its text (the phone can only set text,
 // not status). The routine transcribes it, keeps the transcript in agent_note, and never files it.
 export const TEST_MARK = '[test voice note]';
+
+// The sound of a video file he picked (a class breakdown). It plays silently in the page and the
+// audio is recorded as it plays, so it takes as long as the video. `done` resolves true when the
+// video ends, false if it cannot be played.
+export function audioOfFile(file) {
+  const Ctx = globalThis.AudioContext || globalThis.webkitAudioContext;
+  if (!Ctx) throw new Error('unsupported');
+  const url = URL.createObjectURL(file);
+  const video = document.createElement('video');
+  video.src = url;
+  video.playsInline = true;
+  video.preload = 'auto';
+  const ctx = new Ctx();
+  const dest = ctx.createMediaStreamDestination();
+  ctx.createMediaElementSource(video).connect(dest); // not to the speakers: nothing is heard
+  const done = new Promise((resolve) => {
+    video.addEventListener('ended', () => resolve(true));
+    video.addEventListener('error', () => resolve(false));
+  });
+  const stop = () => {
+    try {
+      video.pause();
+      ctx.close();
+    } catch {
+      // already closed
+    }
+    URL.revokeObjectURL(url);
+  };
+  const start = async () => {
+    await ctx.resume();
+    await video.play();
+  };
+  return { stream: dest.stream, done, stop, start, video };
+}

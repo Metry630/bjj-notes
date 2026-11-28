@@ -185,12 +185,13 @@ export async function discard(id) {
 }
 
 // Start recording. meta: { activity, session_date, location, hours, tags, test }.
-export async function record(meta) {
+export async function record(meta, { stream } = {}) {
   const r = { id: uid(), created_at: new Date().toISOString(), state: 'recording', meta: { ...meta }, mime: '', bytes: 0, chunks: 0, sent: 0, seconds: 0, committed: false };
   const mine = [];
   memory.set(r.id, mine);
   let chain = Promise.resolve();
   const rec = await startRecording({
+    stream,
     onChunk: (blob) => {
       const seq = r.chunks++;
       chain = chain

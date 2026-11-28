@@ -5,6 +5,8 @@ His requests (from `App · Feedback`) always go above your own items.
 
 ## Up next
 
+- [x] **Upload class breakdown videos** (he asked, 28 Nov). Reading chosen: a picker on the capture card takes a video, plays it silently and records its sound as a voice note tagged breakdown (shipped 1.2.0). Routine files each move it names as a tip. Possible follow-up: skip the real-time wait.
+
 - [x] **One-time check after the rework** (21 Nov). Run `node tools/check-public.mjs f0c1e9f` (the laptop
       session had no sheet token, so its pushes were checked for secrets only) and say in the log whether
       it passed. Result 22 Nov: flagged 1 line (tools/dev/fake.js:59, a synthetic numbers-only ladder fixture, likely a false match on digits). Once `ping` reports version 5, set `acted_at` on decision `dec-multi-activity` (the v5 paste replaces it).

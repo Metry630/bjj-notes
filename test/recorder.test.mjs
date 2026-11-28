@@ -84,3 +84,17 @@ import { TEST_MARK } from '../src/recorder.js';
 test('test recordings carry a fixed marker the routine can recognise', () => {
   assert.equal(TEST_MARK, '[test voice note]');
 });
+
+test('startRecording uses a given stream instead of the microphone', async () => {
+  install();
+  let asked = false;
+  globalThis.navigator.mediaDevices.getUserMedia = async () => {
+    asked = true;
+    return { getTracks: () => [] };
+  };
+  const { startRecording } = await import('../src/recorder.js');
+  const r = await startRecording({ stream: { getTracks: () => [{ stop() {} }] } });
+  const out = await r.stop();
+  assert.equal(asked, false);
+  assert.equal(out.blob.size, 3);
+});
